@@ -1,0 +1,14 @@
+{
+	"telegram": {
+		"botToken": ""
+	},
+	"sonarr": {
+		"hostname": "", 
+		"apiKey": "",
+		"port": 8989, 
+		"urlBase": "", 
+		"ssl": false,
+		"username": "",
+		"password": ""
+	}
+}
