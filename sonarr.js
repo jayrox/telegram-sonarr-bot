@@ -41,7 +41,7 @@ bot.onText(/\/start/, function(msg) {
 
   var response = [];
 
-  response.push('Hello ' + username + ', use /s to search');
+  response.push('Hello ' + username + ', use /q to search');
   response.push('\n`/q [series name]` to continue...');
 
   var opts = {
