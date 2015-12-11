@@ -1,27 +1,32 @@
 # telegram-sonarr-bot
 
-Bot which lets you or others add series to [Sonarr](https://sonarr.tv/).
+Bot which lets you or others add series to [Sonarr](https://sonarr.tv/) via the messaging service [Telegram](https://telegram.org/).
 
 Contact [@BotFather](http://telegram.me/BotFather) on Telegram to create and get a bot token.
 
-For now, please make your bot username something unique. For example @fred-flintstone-sonarr-bot or something
+For now, please make your bot username something unique. For example @fred-flintstone-sonarr-bot or something...
 
-## Setup
+Getting Started
+---------------
 
-Make sure you have node, npm, and git installed then in shell / command prompt
+### Prerequisites
+- [Node.js](http://nodejs.org)
+- [Git](https://git-scm.com/downloads) (optional)
 
-**Clone the repo**
+### Installation
+
 ```bash
-$ git clone https://github.com/onedr0p/telegram-sonarr-bot
+# Clone the repository
+git clone https://github.com/onedr0p/telegram-sonarr-bot
 ```
 
-**Install the dependencies**
 ```bash
-$ cd telegram-sonarr-bot
-$ npm install
+# Install dependencies
+cd telegram-sonarr-bot
+npm install
 ```
 
-Then move `config.json.template` to `config.json` and fill in the values.
+Then copy `config.json.template` to `config.json` and fill in the values.
 
 Please refer to the Sonarr specific configuration below:
 
@@ -33,13 +38,12 @@ Please refer to the Sonarr specific configuration below:
 - **username**: HTTP Auth username (default: empty)
 - **password**: HTTP Auth password (default: empty)
 
-
-**Start the bot with node, forever, pm2 or w/e**
 ```bash
-$ node sonarr.js
+# Start the bot
+node sonarr.js
 ```
 
-## Usage
+### Usage
 
 Send the bot a message with the series name
 
@@ -98,12 +102,12 @@ Send the number of the folder
 
 If everything goes well, you'll see a text from the bot saying the series was added.
 
-## Changelog
+### Changelog
 
-### v0.1.0
+#### v0.1.0
 - Initial release
 
-## License
+### License
 (The MIT License)
 
 Copyright (c) 2015 Devin Buhl <devin.kray@gmail.com>
