@@ -104,6 +104,10 @@ If everything goes well, you'll see a text from the bot saying the series was ad
 
 ### Changelog
 
+#### v0.1.1
+- Added RSS Sync command `/rss`
+- Added Refresh All Series command `/refresh`
+
 #### v0.1.0
 - Initial release
 
