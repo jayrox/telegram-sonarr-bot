@@ -303,5 +303,40 @@ bot.onText(/\/[fF](older)? ([\d]{1})/, function(msg, match) {
     cache.del("seriesId" + fromId);
     cache.del("seriesList" + fromId);	
   });
+});
+
+/*
+ * handle rss sync
+ */
+bot.onText(/\/rss/, function(msg) {
+  var messageId = msg.message_id;
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
   
+  sonarr.post("command", { "name": "RssSync" })
+  .then(function () {
+	console.log(fromId + ' sent command for rss sync');
+	bot.sendMessage(chatId, 'RSS Sync command sent.');
+  })
+  .catch(function(err) {
+    bot.sendMessage(chatId, 'Oh no! ' + err);
+  });
+});
+
+/*
+ * handle refresh series
+ */
+bot.onText(/\/refresh/, function(msg) {
+  var messageId = msg.message_id;
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+  
+  sonarr.post("command", { "name": "RefreshSeries" })
+  .then(function () {
+	console.log(fromId + ' sent command for refresh series');
+	bot.sendMessage(chatId, 'Refresh series command sent.');
+  })
+  .catch(function(err) {
+    bot.sendMessage(chatId, 'Oh no! ' + err);
+  });
 });
