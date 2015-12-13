@@ -99,7 +99,7 @@ Send the number of the profile
 /p 2
 ```
 
-Lastly, the bot will ask you where the path you want the series to go
+The bot will ask you where the path you want the series to go
 
 ```
 Found 2 folders:
@@ -115,9 +115,25 @@ Send the number of the folder
 /f 1
 ```
 
+Lastly, the bot will ask you which seasons you would like to monitor/download
+
+```
+Select which seasons to monitor:
+1) future
+2) all
+3) none
+4) latest
+5) first
+
+/m [n] to continue...
+```
+
 If everything goes well, you'll see a text from the bot saying the series was added.
 
 ### Changelog
+
+#### v0.1.3
+- Initial monitoring support, please report bugs if found...
 
 #### v0.1.2
 - Added Docker support

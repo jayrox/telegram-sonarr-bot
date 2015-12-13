@@ -59,7 +59,7 @@ bot.onText(/\/start/, function(msg) {
 });
 
 /*
- * handle query command
+ * on query, select series
  */
 bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
   var messageId = msg.message_id;
@@ -124,7 +124,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 });
 
 /*
- * handle series selection
+ * on series, select quality profile
  */
 bot.onText(/\/[sS](eries)? ([\d]{1})/, function(msg, match) {
   var messageId = msg.message_id;
@@ -151,7 +151,7 @@ bot.onText(/\/[sS](eries)? ([\d]{1})/, function(msg, match) {
     console.log(fromId + ' requested to get profiles list');
 
     var profileList = [];
-    var response = ['*Found ' + profiles.length + ' profiles:*'];
+    var response = ['*Found ' + profiles.length + ' profiles:*\n'];
     _.forEach(profiles, function(n, key) {
 	  profileList.push({
 	    "id": key + 1,
@@ -181,7 +181,7 @@ bot.onText(/\/[sS](eries)? ([\d]{1})/, function(msg, match) {
 });
 
 /*
- * handle folder selection
+ * on quality profile, select folder
  */
 bot.onText(/\/[pP](rofile)? ([\d]{1})/, function(msg, match) {
   var messageId = msg.message_id;
@@ -238,7 +238,7 @@ bot.onText(/\/[pP](rofile)? ([\d]{1})/, function(msg, match) {
 });
 
 /*
- * handle series type selection
+ * on folder, select monitored
  */
 bot.onText(/\/[fF](older)? ([\d]{1})/, function(msg, match) {
   var messageId = msg.message_id;
@@ -246,15 +246,53 @@ bot.onText(/\/[fF](older)? ([\d]{1})/, function(msg, match) {
   var fromId = msg.from.id;
   
   var folderId = match[2];
-  var folderList = cache.get("seriesFolderList" + fromId);
-  
-  var profileId = cache.get("seriesProfileId" + fromId);
-  var profileList = cache.get("seriesProfileList" + fromId);
-  
+
+  // set movie option to cache
+  cache.set("seriesFolderId" + fromId, folderId);
+
+  console.log(fromId + ' requested to get monitor list');
+
+  var monitor = ['future', 'all', 'none', 'latest', 'first'];
+  var monitorList = [];
+  var response = ['*Select which seasons to monitor:*'];
+  _.forEach(monitor, function(n, key) {
+    monitorList.push({
+      "id": key + 1,
+      "type": n
+    });
+
+    response.push('*' + (key + 1) + '*) ' + n);
+  });
+
+  response.push('\n`/m [n]` to continue...');
+
+  // set cache
+  cache.set("seriesMonitorList" + fromId, monitorList);
+
+  bot.sendMessage(chatId, response.join('\n'), {
+	"selective": 2,
+	"parse_mode": "Markdown"
+  });
+});
+
+/*
+ * on monitor, add series
+ */
+bot.onText(/\/[mM](onitor)? ([\d]{1})/, function(msg, match) {
+  var messageId = msg.message_id;
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+  var monitorId = match[2];
+
   var seriesId = cache.get("seriesId" + fromId);
   var seriesList = cache.get("seriesList" + fromId);
+  var profileId = cache.get("seriesProfileId" + fromId);
+  var profileList = cache.get("seriesProfileList" + fromId);
+  var folderId = cache.get("seriesFolderId" + fromId);
+  var folderList = cache.get("seriesFolderList" + fromId);
+  var monitorList = cache.get("seriesMonitorList" + fromId);
 
-  if (folderList === undefined || profileList === undefined || seriesList === undefined) {
+  if (folderList === undefined || profileList === undefined || seriesList === undefined || monitorList === undefined) {
     bot.sendMessage(chatId, 'Oh no! Error: something went wrong, try searching again');
   }
   
@@ -270,18 +308,76 @@ bot.onText(/\/[fF](older)? ([\d]{1})/, function(msg, match) {
     return item.id == folderId;
   })[0];
 
-  sonarr.post("series", {
-    "tvdbId": series.tvdbId,
-	"title": series.title,
-	"titleSlug": series.titleSlug,
-	"seasons": series.seasons,
-	"rootFolderPath": folder.path,
-	"seasonFolder": true,
-	"monitored": false,
-	"seriesType": "standard",
-	"qualityProfileId": profile.profileId
+  var monitor = _.filter(monitorList, function(item) {
+    return item.id == monitorId;
+  })[0];
+
+  var postOpts = {};
+  postOpts.tvdbId = series.tvdbId;
+  postOpts.title = series.title;
+  postOpts.titleSlug = series.titleSlug;
+  postOpts.rootFolderPath = folder.path;
+  postOpts.seasonFolder = true;
+  postOpts.monitored = true;
+  postOpts.seriesType = "standard";
+  postOpts.qualityProfileId = profile.profileId;
+
+  var lastSeason = _.max(series.seasons, 'seasonNumber');
+  var firstSeason = _.min(_.reject(series.seasons, { seasonNumber : 0 }), 'seasonNumber');
+
+  // ['future', 'all', 'none', 'latest', 'first'];
+  if (monitor.type == 'future') {
+  	postOpts.addOptions = {};
+  	postOpts.addOptions.ignoreEpisodesWithFiles = true;
+  	postOpts.addOptions.ignoreEpisodesWithoutFiles = true;
+  } 
+  else if (monitor.type == 'all') {
+  	postOpts.addOptions = {};
+  	postOpts.addOptions.ignoreEpisodesWithFiles = false;
+  	postOpts.addOptions.ignoreEpisodesWithoutFiles = false;
+  }
+  else if (monitor.type == 'none') {
+  	// mark all seasons (+1) not monitored
+  	_.each(series.seasons, function(season) {
+      if (season.seasonNumber >= lastSeason.seasonNumber + 1) {
+        season.monitored = true;
+      } else {
+        season.monitored = false;
+      }
+	});
+  }
+  else if (monitor.type == 'latest') {
+  	// update latest season to be monitored
+  	_.each(series.seasons, function(season) {
+      if (season.seasonNumber >= lastSeason.seasonNumber) {
+        season.monitored = true;
+      } else {
+        season.monitored = false;
+      }
+	});
+  }
+  else if (monitor.type == 'first') {
+  	// mark all as not monitored
+  	_.each(series.seasons, function(season) {
+      if (season.seasonNumber >= lastSeason.seasonNumber + 1) {
+        season.monitored = true;
+      } else {
+        season.monitored = false;
+      }
+	});
 	
-  })
+	// update first season
+	_.each(series.seasons, function(season) {
+      if (season.seasonNumber === firstSeason.seasonNumber) {
+        season.monitored = !season.monitored;
+      }
+    });
+  }
+
+  // update seasons to be monitored
+  postOpts.seasons = series.seasons;
+
+  sonarr.post("series", postOpts)
   .then(function(result) {
 
     console.log(fromId + ' added series ' + series.title);
@@ -299,16 +395,15 @@ bot.onText(/\/[fF](older)? ([\d]{1})/, function(msg, match) {
     bot.sendMessage(chatId, "Oh no! " + err);
   })
   .finally(function() {
-
-    // delete cache items
-    cache.del("seriesFolderList" + fromId);
-	
-    cache.del("seriesProfileId" + fromId);
-    cache.del("seriesProfileList" + fromId);
-	
     cache.del("seriesId" + fromId);
     cache.del("seriesList" + fromId);	
+    cache.del("seriesProfileId" + fromId);
+    cache.del("seriesProfileList" + fromId);
+    cache.del("seriesFolderId" + fromId);
+    cache.del("seriesFolderList" + fromId);
+    cache.del("seriesMonitorList" + fromId);
   });
+
 });
 
 /*
