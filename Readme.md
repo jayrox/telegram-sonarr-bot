@@ -46,7 +46,7 @@ node sonarr.js
 ### Docker
 Alternatively you may use Docker to start the bot
 ```
-docker run --rm -it \
+docker run --name telegram-sonarr-bot \
   -e TELEGRAM_BOTTOKEN=
   -e SONARR_HOST=
   -e SONARR_APIKEY=
