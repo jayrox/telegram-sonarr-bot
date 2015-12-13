@@ -5,20 +5,26 @@ var TelegramBot = require('node-telegram-bot-api');
 var NodeCache = require("node-cache");
 var _ = require("lodash");
 
-var config = require('./config.json');
+try {
+  var config = require('./config.json');
+} catch(e) {
+  var config = {};
+  config.telegram = {};
+  config.sonarr = {};
+}
 
-var bot = new TelegramBot(config.telegram.botToken, {
+var bot = new TelegramBot(process.env.TELEGRAM_BOTTOKEN || config.telegram.botToken, {
   polling: true
 });
 
 var sonarr = new SonarrAPI({
-  hostname: config.sonarr.hostname,
-  apiKey: config.sonarr.apiKey,
-  port: config.sonarr.port,
-  urlBase: config.sonarr.urlBase,
-  ssl: config.sonarr.ssl,
-  username: config.sonarr.username,
-  password: config.sonarr.password
+  hostname: process.env.SONARR_HOST || config.sonarr.hostname,
+  apiKey: process.env.SONARR_APIKEY || config.sonarr.apiKey,
+  port: process.env.SONARR_PORT || config.sonarr.port || 8989,
+  urlBase: process.env.SONARR_URLBASE || config.sonarr.urlBase,
+  ssl: process.env.SONARR_SSL || config.sonarr.ssl,
+  username: process.env.SONARR_USERNAME || config.sonarr.username,
+  password: process.env.SONARR_PASSWORD || config.sonarr.password
 });
 
 var cache = new NodeCache();
