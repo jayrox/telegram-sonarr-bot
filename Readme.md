@@ -43,6 +43,21 @@ Please refer to the Sonarr specific configuration below:
 node sonarr.js
 ```
 
+### Docker
+Alternatively you may use Docker to start the bot
+```
+docker run --rm -it \
+  -e TELEGRAM_BOTTOKEN=
+  -e SONARR_HOST=
+  -e SONARR_APIKEY=
+  -e SONARR_PORT=
+  -e SONARR_URLBASE=
+  -e SONARR_SSL=
+  -e SONARR_USERNAME=
+  -e SONARR_PASSWORD=
+  telegram-sonarr-bot
+```
+
 ### Usage
 
 Send the bot a message with the series name
@@ -103,6 +118,9 @@ Send the number of the folder
 If everything goes well, you'll see a text from the bot saying the series was added.
 
 ### Changelog
+
+#### v0.1.2
+- Added Docker support
 
 #### v0.1.1
 - Added RSS Sync command `/rss`
