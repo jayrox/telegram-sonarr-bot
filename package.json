@@ -3,7 +3,7 @@
     "bluebird": "^2.9.2",
     "lodash": "^3.10.0",
     "node-cache": "^3.0.0",
-    "node-telegram-bot-api": "0.15.0",
+    "node-telegram-bot-api": "^0.17.0",
     "request": "^2.36.0"
   }
 }
