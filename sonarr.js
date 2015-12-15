@@ -128,7 +128,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 /*
  * on series, select quality profile
  */
-bot.onText(/\/[sS](eries)? ([\d]{1})/, function(msg, match) {
+bot.onText(/\/[sS](eries)? ([\d]+)/, function(msg, match) {
   var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
@@ -185,7 +185,7 @@ bot.onText(/\/[sS](eries)? ([\d]{1})/, function(msg, match) {
 /*
  * on quality profile, select folder
  */
-bot.onText(/\/[pP](rofile)? ([\d]{1})/, function(msg, match) {
+bot.onText(/\/[pP](rofile)? ([\d]+)/, function(msg, match) {
   var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
@@ -242,7 +242,7 @@ bot.onText(/\/[pP](rofile)? ([\d]{1})/, function(msg, match) {
 /*
  * on folder, select monitored
  */
-bot.onText(/\/[fF](older)? ([\d]{1})/, function(msg, match) {
+bot.onText(/\/[fF](older)? ([\d]+)/, function(msg, match) {
   var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
@@ -280,7 +280,7 @@ bot.onText(/\/[fF](older)? ([\d]{1})/, function(msg, match) {
 /*
  * on monitor, add series
  */
-bot.onText(/\/[mM](onitor)? ([\d]{1})/, function(msg, match) {
+bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
   var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
@@ -299,19 +299,19 @@ bot.onText(/\/[mM](onitor)? ([\d]{1})/, function(msg, match) {
   }
 
   var series = _.filter(seriesList, function(item) {
-    return item.id === seriesId;
+    return item.id == seriesId;
   })[0];
 
   var profile = _.filter(profileList, function(item) {
-    return item.id === profileId;
+    return item.id == profileId;
   })[0];
 
   var folder = _.filter(folderList, function(item) {
-    return item.id === folderId;
+    return item.id == folderId;
   })[0];
 
   var monitor = _.filter(monitorList, function(item) {
-    return item.id === monitorId;
+    return item.id == monitorId;
   })[0];
 
   var postOpts = {};
