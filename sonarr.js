@@ -295,7 +295,7 @@ bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
   var monitorList = cache.get('seriesMonitorList' + fromId);
 
   if (folderList === undefined || profileList === undefined || seriesList === undefined || monitorList === undefined) {
-    bot.sendMessage(chatId, 'Oh no! Error: something went wrong, try searching again');
+    bot.sendMessage(chatId, 'Oh no! Something went wrong, try searching again');
   }
 
   var series = _.filter(seriesList, function(item) {
