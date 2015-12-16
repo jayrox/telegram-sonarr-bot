@@ -134,6 +134,10 @@ If everything goes well, you'll see a text from the bot saying the series was ad
 
 ### Changelog
 
+#### v0.1.5
+- Added command `/clear` to wipe all previous commands chain
+- More housekeeping
+
 #### v0.1.4
 - Sonarr lib is now on npm (you will need to run npm install if you are upgrading)
 - Updated a few dev things

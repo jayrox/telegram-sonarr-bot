@@ -64,7 +64,6 @@ bot.onText(/\/start/, function(msg) {
  * on query, select series
  */
 bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
-  var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
   var seriesName = match[2];
@@ -129,7 +128,6 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
  * on series, select quality profile
  */
 bot.onText(/\/[sS](eries)? ([\d]+)/, function(msg, match) {
-  var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
   var seriesId = match[2];
@@ -186,7 +184,6 @@ bot.onText(/\/[sS](eries)? ([\d]+)/, function(msg, match) {
  * on quality profile, select folder
  */
 bot.onText(/\/[pP](rofile)? ([\d]+)/, function(msg, match) {
-  var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
   var profileId = match[2];
@@ -243,7 +240,6 @@ bot.onText(/\/[pP](rofile)? ([\d]+)/, function(msg, match) {
  * on folder, select monitored
  */
 bot.onText(/\/[fF](older)? ([\d]+)/, function(msg, match) {
-  var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
@@ -281,7 +277,6 @@ bot.onText(/\/[fF](older)? ([\d]+)/, function(msg, match) {
  * on monitor, add series
  */
 bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
-  var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
   var monitorId = match[2];
@@ -329,7 +324,6 @@ bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
     seasonNumber: 0
   }), 'seasonNumber');
 
-  // ['future', 'all', 'none', 'latest', 'first'];
   if (monitor.type === 'future') {
     postOpts.addOptions = {};
     postOpts.addOptions.ignoreEpisodesWithFiles = true;
@@ -410,7 +404,6 @@ bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
  * handle rss sync
  */
 bot.onText(/\/rss/, function(msg) {
-  var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
@@ -428,7 +421,6 @@ bot.onText(/\/rss/, function(msg) {
  * handle refresh series
  */
 bot.onText(/\/refresh/, function(msg) {
-  var messageId = msg.message_id;
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
@@ -440,4 +432,22 @@ bot.onText(/\/refresh/, function(msg) {
     .catch(function(err) {
       bot.sendMessage(chatId, 'Oh no! ' + err);
     });
+});
+
+/*
+ * handle clear command
+ */
+bot.onText(/\/clear/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  cache.del('seriesId' + fromId);
+  cache.del('seriesList' + fromId);
+  cache.del('seriesProfileId' + fromId);
+  cache.del('seriesProfileList' + fromId);
+  cache.del('seriesFolderId' + fromId);
+  cache.del('seriesFolderList' + fromId);
+  cache.del('seriesMonitorList' + fromId);
+
+  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
 });
