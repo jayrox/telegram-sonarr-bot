@@ -58,6 +58,8 @@ docker run --name telegram-sonarr-bot \
   telegram-sonarr-bot
 ```
 
+**Prebuilt** Docker image for this bot can be found [here](https://hub.docker.com/r/subzero79/docker-telegram-sonarr-bot), thanks [@subzero79](https://github.com/subzero79)
+
 ### Usage
 
 Send the bot a message with the series name
