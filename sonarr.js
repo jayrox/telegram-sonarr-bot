@@ -1,6 +1,6 @@
 'use strict';
 
-var SonarrAPI = require('./lib/sonarr-api');
+var SonarrAPI = require('sonarr-api');
 var TelegramBot = require('node-telegram-bot-api');
 var NodeCache = require('node-cache');
 var _ = require('lodash');
