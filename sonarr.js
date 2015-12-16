@@ -164,7 +164,7 @@ bot.onText(/\/[sS](eries)? ([\d]+)/, function(msg, match) {
         response.push('*' + (key + 1) + '*) ' + n.name);
       });
 
-      response.push('\n`/p [n]` to continue...');
+      response.push('\n\n`/p [n]` to continue...');
 
       // set cache
       cache.set('seriesProfileList' + fromId, profileList);
