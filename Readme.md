@@ -134,6 +134,9 @@ If everything goes well, you'll see a text from the bot saying the series was ad
 
 ### Changelog
 
+#### v0.1.6
+- `/q` now responds with link to series on thetvdb.com
+
 #### v0.1.5
 - Added command `/clear` to wipe all previous commands chain
 - More housekeeping

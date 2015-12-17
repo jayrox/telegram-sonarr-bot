@@ -98,7 +98,9 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
         });
 
         response.push(
-          '*' + id + '*) ' + n.title + (n.year ? ' - _' + n.year + '_' : '')
+          '*' + id + '*) ' +
+          '[' + n.title + '](http://thetvdb.com/?tab=series&id=' + n.tvdbId + ')' +
+          (n.year ? ' - _' + n.year + '_' : '')
         );
       });
 
