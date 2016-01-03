@@ -134,6 +134,9 @@ If everything goes well, you'll see a text from the bot saying the series was ad
 
 ### Changelog
 
+#### v0.1.7
+- Added custom keyboard, thanks @jayrox
+
 #### v0.1.6
 - `/q` now responds with link to series on thetvdb.com
 
