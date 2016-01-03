@@ -505,7 +505,7 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   console.log(profile)
 
   var folder = _.filter(folderList, function(item) {
-    return item.id == folderId;
+    return item.folderId == folderId;
   })[0];
   
   console.log("folderId: " + folderId)
