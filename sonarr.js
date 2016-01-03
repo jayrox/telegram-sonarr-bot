@@ -77,16 +77,17 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
       return result;
     })
     .then(function(series) {
-      console.log(fromId + ' requested to search for movie ' + seriesName);
+      console.log(fromId + ' requested to search for series ' + seriesName);
 
       var seriesList = [];
+      var keyboardList = [];
       var response = ['*Found ' + series.length + ' series:*'];
 
       _.forEach(series, function(n, key) {
 
         var id = key + 1;
-        var title = n.title;
-        var year = ('year' in n ? n.year : '');
+        var keyboard_value = n.title + (n.year ? ' - ' + n.year : '');
+        
 
         seriesList.push({
           'id': id,
@@ -94,9 +95,12 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
           'year': n.year,
           'tvdbId': n.tvdbId,
           'titleSlug': n.titleSlug,
-          'seasons': n.seasons
+          'seasons': n.seasons,
+          'keyboard_value': keyboard_value
         });
-
+        
+        keyboardList.push([keyboard_value])
+        
         response.push(
           '*' + id + '*) ' +
           '[' + n.title + '](http://thetvdb.com/?tab=series&id=' + n.tvdbId + ')' +
@@ -104,22 +108,45 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
         );
       });
 
-      response.push('\n`/s [n]` to continue...');
+      response.push('\nPlease select from the menu below...');
 
       // set cache
-      cache.set('seriesList' + fromId, seriesList);
+      cache.set("seriesList" + fromId, seriesList);
+      cache.set('state' + fromId, state.SERIES);
 
-      // console.log(seriesList);
-
-      return response.join('\n');
+      return new Response(response.join('\n'), keyboardList);
     })
     .then(function(response) {
+    var keyboard = {
+        keyboard: response.keyboard,
+        one_time_keyboard: true
+      };
       var opts = {
         'disable_web_page_preview': true,
         'parse_mode': 'Markdown',
         'selective': 2,
+        'reply_markup': JSON.stringify(keyboard),
       };
-      bot.sendMessage(chatId, response, opts);
+      bot.sendMessage(chatId, response.message, opts);
+    })
+    .catch(function(err) {
+      bot.sendMessage(chatId, 'Oh no! ' + err);
+    });
+});
+
+
+
+/*
+ * handle rss sync
+ */
+bot.onText(/\/rss/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  sonarr.post('command', { 'name': 'RssSync' })
+    .then(function() {
+      console.log(fromId + ' sent command for rss sync');
+      bot.sendMessage(chatId, 'RSS Sync command sent.');
     })
     .catch(function(err) {
       bot.sendMessage(chatId, 'Oh no! ' + err);
@@ -127,133 +154,280 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 });
 
 /*
- * on series, select quality profile
+ * handle refresh series
  */
-bot.onText(/\/[sS](eries)? ([\d]+)/, function(msg, match) {
+bot.onText(/\/refresh/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
-  var seriesId = match[2];
 
-  // set movie option to cache
-  cache.set('seriesId' + fromId, seriesId);
-
-  sonarr.get('profile')
-    .then(function(result) {
-      if (!result.length) {
-        throw new Error('could not get profiles, try searching again');
-      }
-
-      if (cache.get('seriesList' + fromId) === undefined) {
-        throw new Error('could not get previous series list, try searching again');
-      }
-
-      return result;
+  sonarr.post('command', { 'name': 'RefreshSeries' })
+    .then(function() {
+      console.log(fromId + ' sent command for refresh series');
+      bot.sendMessage(chatId, 'Refresh series command sent.');
     })
-    .then(function(profiles) {
-      console.log(fromId + ' requested to get profiles list');
+    .catch(function(err) {
+      bot.sendMessage(chatId, 'Oh no! ' + err);
+    });
+});
 
-      var profileList = [];
-      var response = ['*Found ' + profiles.length + ' profiles:*\n'];
-      _.forEach(profiles, function(n, key) {
-        profileList.push({
-          'id': key + 1,
-          'name': n.name,
-          'profileId': n.id
-        });
+/*
+ * handle clear command
+ */
+bot.onText(/\/clear/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
 
-        response.push('*' + (key + 1) + '*) ' + n.name);
-      });
+  cache.del('seriesId' + fromId);
+  cache.del('seriesList' + fromId);
+  cache.del('seriesProfileId' + fromId);
+  cache.del('seriesProfileList' + fromId);
+  cache.del('seriesFolderId' + fromId);
+  cache.del('seriesFolderList' + fromId);
+  cache.del('seriesMonitorList' + fromId);
 
-      response.push('\n\n`/p [n]` to continue...');
+  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
+});
 
-      // set cache
-      cache.set('seriesProfileList' + fromId, profileList);
+/*
+ * Shared err message logic, primarily to handle removing the custom keyboard
+ */
+function replyWithError(chatId, err) {
+  bot.sendMessage(chatId, 'Oh no! ' + err, {
+    'parse_mode': 'Markdown',
+    'reply_markup': {
+      'hide_keyboard': false
+    }
+  });
+}
 
-      return response.join(' ');
-    })
-    .then(function(response) {
-      bot.sendMessage(chatId, response, {
+class Response {
+    constructor(message, keyboard) {
+      this.message = message;
+      this.keyboard = keyboard;
+    }
+}
+
+var state = {
+  SERIES: 1,
+  PROFILE: 2,
+  FOLDER: 3,
+  MONITOR: 4
+};
+
+/*
+ Captures any and all messages, filters out commands, handles profiles and movies
+ sent via the custom keyboard.
+ */
+bot.on('message', function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+  // If the message is a command, ignore it.
+  if(msg.text[0] != '/') {
+    // Check cache to determine state, if cache empty prompt user to start a movie search
+    var currentState = cache.get('state' + fromId);
+    if (currentState === undefined) {
+      replyWithError(chatId, new Error('Try searching for a movie first with `/m movie name`'));
+    } else {
+      switch(currentState) {
+        case state.SERIES:
+          var seriesDisplayName = msg.text;
+          handleSeries(chatId, fromId, seriesDisplayName);
+          break;  
+        case state.PROFILE:
+          var seriesProfileName = msg.text;
+          handleSeriesProfile(chatId, fromId, seriesProfileName);
+          break;  
+        case state.FOLDER:
+          var seriesFolderName = msg.text;
+          handleSeriesFolder(chatId, fromId, seriesFolderName);
+          break;
+        case state.MONITOR:
+          var seriesMonitor = msg.text;
+          handleSeriesMonitor(chatId, fromId, seriesMonitor);
+          break;            
+        default:
+          replyWithError(chatId, new Error('Unsure what\'s going on, use the `/clear` command and start over.'));
+      }
+    }
+  }
+});
+
+function handleSeries(chatId, fromId, seriesDisplayName) {
+  var seriesList = cache.get('seriesList'+fromId);
+  if (seriesList === undefined) {
+    replyWithError(chatId, new Error('something went wrong, try searching again'));
+  }
+  var series = _.filter(seriesList, function(item) {
+    return item.keyboard_value == seriesDisplayName;
+  })[0];
+  if(series === undefined){
+    replyWithError(chatId, new Error('Could not find the series with title "' + seriesDisplayName + '"'));
+  }
+  
+  var seriesId = series.id;
+  
+  cache.set('seriesId'+fromId, seriesId);
+  
+  sonarr.get("profile")
+  .then(function (result) {
+    if (!result.length) {
+      throw new Error("could not get profiles, try searching again");
+    }
+	
+	if (cache.get("seriesList" + fromId) === undefined) {
+      throw new Error("could not get previous series list, try searching again");
+    }
+
+    return result;
+  })
+  .then(function(profiles) {
+    console.log(fromId + ' requested to get profiles list');
+
+    var profileList = [];
+    var keyboardList = [];
+    var keyboardRow = [];
+
+    var response = ['*Found ' + profiles.length + ' profiles:*'];
+    _.forEach(profiles, function(n, key) {
+	  profileList.push({
+	    "id": key + 1,
+	    "name": n.name,
+        "label": n.name,
+	    "profileId": n.id
+	  });
+
+      response.push('*' + (key + 1) + '*) ' + n.name);
+
+      // Profile names are short, put two on each custom
+      // keyboard row to reduce scrolling
+      keyboardRow.push(n.name);
+      if (keyboardRow.length == 2) {
+        keyboardList.push(keyboardRow);
+        keyboardRow = [];
+      }
+    });
+      
+    if (keyboardRow.length == 1) {
+      keyboardList.push([keyboardRow[0]])
+    }
+    response.push('\nPlease select from the menu below.');
+
+    // set cache
+    cache.set("seriesProfileList" + fromId, profileList);
+    cache.set('state' + fromId, state.PROFILE);
+
+    return new Response(response.join('\n'), keyboardList);
+  })
+  .then(function(response) {
+      var keyboard = {
+        keyboard: response.keyboard,
+        one_time_keyboard: true
+      };
+      var opts = {
+        'disable_web_page_preview': true,
+        'parse_mode': 'Markdown',
         'selective': 2,
-        'parse_mode': 'Markdown'
-      });
-    })
-    .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
+        'reply_markup': JSON.stringify(keyboard),
+      };
+      bot.sendMessage(chatId, response.message, opts);
+  })
+  .catch(function(err) {
+    bot.sendMessage(chatId, "Oh no! " + err);
+  });
+}
+
+function handleSeriesProfile(chatId, fromId, profileName) {
+  var profileList = cache.get('seriesProfileList' + fromId);
+  if (profileList === undefined) {
+    replyWithError(chatId, new Error('Error: something went wrong, try searching again'));
+  }
+
+  var profile = _.filter(profileList, function(item) {
+    return item.label == profileName;
+  })[0];
+  if(profile === undefined){
+    replyWithError(chatId, new Error('Could not find the profile "' + profileName + '"'));
+  }
+
+  var profileId = profile.id;
+  
+  // set series option to cache
+  cache.set("seriesProfileId" + fromId, profileId);
+  
+  sonarr.get("rootfolder")
+  .then(function (result) {
+    if (!result.length) {
+      throw new Error("could not get folders, try searching again");
+    }
+    if (cache.get("seriesList" + fromId) === undefined) {
+      throw new Error("could not get previous list, try searching again");
+    }
+    return result;
+  })
+  .then(function(folders) {
+    console.log(fromId + ' requested to get folder list');
+
+    var folderList = [];
+    var keyboardList = [];
+    var response = ['*Found ' + folders.length + ' folders:*'];
+    _.forEach(folders, function(n, key) {
+	  folderList.push({
+	    "id": key + 1,
+	    "path": n.path,
+	    "folderId": n.id
+	  });
+
+	  response.push('*' + (key + 1) + '*) ' + n.path);
+      
+      keyboardList.push([n.path])
     });
-});
+    response.push('\nPlease select from the menu below.');
 
-/*
- * on quality profile, select folder
- */
-bot.onText(/\/[pP](rofile)? ([\d]+)/, function(msg, match) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-  var profileId = match[2];
+    // set cache
+    cache.set("seriesFolderList" + fromId, folderList);
+    cache.set('state' + fromId, state.FOLDER);
 
-  // set movie option to cache
-  cache.set('seriesProfileId' + fromId, profileId);
-
-  sonarr.get('rootfolder')
-    .then(function(result) {
-      if (!result.length) {
-        throw new Error('could not get folders, try searching again');
-      }
-
-      if (cache.get('seriesList' + fromId) === undefined) {
-        throw new Error('could not get previous series list, try searching again');
-      }
-
-      return result;
-    })
-    .then(function(folders) {
-      console.log(fromId + ' requested to get folder list');
-
-      var folderList = [];
-      var response = ['*Found ' + folders.length + ' folders:*'];
-      _.forEach(folders, function(n, key) {
-        folderList.push({
-          'id': key + 1,
-          'path': n.path,
-          'folderId': n.id
-        });
-
-        response.push('*' + (key + 1) + '*) ' + n.path);
-      });
-
-      response.push('\n`/f [n]` to continue...');
-
-      // set cache
-      cache.set('seriesFolderList' + fromId, folderList);
-
-      return response.join('\n');
-    })
-    .then(function(response) {
-      bot.sendMessage(chatId, response, {
+    return new Response(response.join('\n'), keyboardList);
+  })
+  .then(function(response) {
+      var keyboard = {
+        keyboard: response.keyboard,
+        one_time_keyboard: true
+      };
+      var opts = {
+        'disable_web_page_preview': true,
+        'parse_mode': 'Markdown',
         'selective': 2,
-        'parse_mode': 'Markdown'
-      });
-    })
-    .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
-    });
-});
+        'reply_markup': JSON.stringify(keyboard),
+      };
+      bot.sendMessage(chatId, response.message, opts);
+  })
+  .catch(function(err) {
+    bot.sendMessage(chatId, "Oh no! " + err);
+  });
+}
 
-/*
- * on folder, select monitored
- */
-bot.onText(/\/[fF](older)? ([\d]+)/, function(msg, match) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
+function handleSeriesFolder(chatId, fromId, folderName) {
+  var seriesId = cache.get('seriesId' + fromId);
+  var seriesList = cache.get('seriesList' + fromId);
+  var folderList = cache.get("seriesFolderList" + fromId);
+  if (seriesList === undefined || seriesId === undefined || folderList === undefined) {
+    replyWithError(chatId, new Error('Error: something went wrong, try searching again'));
+  }
 
-  var folderId = match[2];
-
+  var folder = _.filter(folderList, function(item) {
+    return item.path == folderName;
+  })[0];
+  
   // set movie option to cache
-  cache.set('seriesFolderId' + fromId, folderId);
+  cache.set('seriesFolderId' + fromId, folder.folderId);
 
   console.log(fromId + ' requested to get monitor list');
 
   var monitor = ['future', 'all', 'none', 'latest', 'first'];
   var monitorList = [];
+  var keyboardList = [];
+  var keyboardRow = [];
   var response = ['*Select which seasons to monitor:*'];
   _.forEach(monitor, function(n, key) {
     monitorList.push({
@@ -262,27 +436,37 @@ bot.onText(/\/[fF](older)? ([\d]+)/, function(msg, match) {
     });
 
     response.push('*' + (key + 1) + '*) ' + n);
+    
+    keyboardRow.push(n);
+    if (keyboardRow.length == 2) {
+      keyboardList.push(keyboardRow);
+      keyboardRow = [];
+    }
   });
+  if (keyboardRow.length == 1) {
+    keyboardList.push([keyboardRow[0]])
+  }
 
-  response.push('\n`/m [n]` to continue...');
+  response.push('\nPlease select from the menu below.');
 
   // set cache
   cache.set('seriesMonitorList' + fromId, monitorList);
+  cache.set('state' + fromId, state.MONITOR);
 
-  bot.sendMessage(chatId, response.join('\n'), {
+  var keyboard = {
+    keyboard: keyboardList,
+    one_time_keyboard: true
+  };
+  var opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
     'selective': 2,
-    'parse_mode': 'Markdown'
-  });
-});
+    'reply_markup': JSON.stringify(keyboard),
+  };
+  bot.sendMessage(chatId, response.join('\n'), opts);
+}
 
-/*
- * on monitor, add series
- */
-bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-  var monitorId = match[2];
-
+function handleSeriesMonitor(chatId, fromId, monitorType) {
   var seriesId = cache.get('seriesId' + fromId);
   var seriesList = cache.get('seriesList' + fromId);
   var profileId = cache.get('seriesProfileId' + fromId);
@@ -294,7 +478,7 @@ bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
   if (folderList === undefined || profileList === undefined || seriesList === undefined || monitorList === undefined) {
     bot.sendMessage(chatId, 'Oh no! Something went wrong, try searching again');
   }
-
+    
   var series = _.filter(seriesList, function(item) {
     return item.id == seriesId;
   })[0];
@@ -308,9 +492,9 @@ bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
   })[0];
 
   var monitor = _.filter(monitorList, function(item) {
-    return item.id == monitorId;
+    return item.type == monitorType;
   })[0];
-
+  
   var postOpts = {};
   postOpts.tvdbId = series.tvdbId;
   postOpts.title = series.title;
@@ -372,84 +556,40 @@ bot.onText(/\/[mM](onitor)? ([\d]+)/, function(msg, match) {
 
   // update seasons to be monitored
   postOpts.seasons = series.seasons;
+    
+  sonarr.post("series", {
+    "tvdbId": series.tvdbId,
+	 "title": series.title,
+	 "titleSlug": series.titleSlug,
+	 "seasons": series.seasons,
+	 "rootFolderPath": folder.path,
+	 "seasonFolder": true,
+	 "monitored": false,
+	 "seriesType": "standard",
+	 "qualityProfileId": profileId
+  })
+  .then(function(result) {
+    console.log(fromId + ' added series ' + series.title);
 
-  sonarr.post('series', postOpts)
-    .then(function(result) {
+    if (!result) {
+      throw new Error("could not add series, try searching again.");
+    }
 
-      console.log(fromId + ' added series ' + series.title);
-
-      if (!result) {
-        throw new Error('could not add series, try searching again.');
-      }
-
-      bot.sendMessage(chatId, 'Series `' + series.title + '` added', {
-        'selective': 2,
-        'parse_mode': 'Markdown'
-      });
-    })
-    .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
-    })
-    .finally(function() {
-      cache.del('seriesId' + fromId);
-      cache.del('seriesList' + fromId);
-      cache.del('seriesProfileId' + fromId);
-      cache.del('seriesProfileList' + fromId);
-      cache.del('seriesFolderId' + fromId);
-      cache.del('seriesFolderList' + fromId);
-      cache.del('seriesMonitorList' + fromId);
+    bot.sendMessage(chatId, 'Series `' + series.title + '` added', {
+      "selective": 2,
+      "parse_mode": "Markdown"
     });
-
-});
-
-/*
- * handle rss sync
- */
-bot.onText(/\/rss/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  sonarr.post('command', { 'name': 'RssSync' })
-    .then(function() {
-      console.log(fromId + ' sent command for rss sync');
-      bot.sendMessage(chatId, 'RSS Sync command sent.');
-    })
-    .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
-    });
-});
-
-/*
- * handle refresh series
- */
-bot.onText(/\/refresh/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  sonarr.post('command', { 'name': 'RefreshSeries' })
-    .then(function() {
-      console.log(fromId + ' sent command for refresh series');
-      bot.sendMessage(chatId, 'Refresh series command sent.');
-    })
-    .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
-    });
-});
-
-/*
- * handle clear command
- */
-bot.onText(/\/clear/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  cache.del('seriesId' + fromId);
-  cache.del('seriesList' + fromId);
-  cache.del('seriesProfileId' + fromId);
-  cache.del('seriesProfileList' + fromId);
-  cache.del('seriesFolderId' + fromId);
-  cache.del('seriesFolderList' + fromId);
-  cache.del('seriesMonitorList' + fromId);
-
-  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
-});
+  })
+  .catch(function(err) {
+    bot.sendMessage(chatId, "Oh no! " + err);
+  })
+  .finally(function() {
+    cache.del('seriesId' + fromId);
+    cache.del('seriesList' + fromId);
+    cache.del('seriesProfileId' + fromId);
+    cache.del('seriesProfileList' + fromId);
+    cache.del('seriesFolderId' + fromId);
+    cache.del('seriesFolderList' + fromId);
+    cache.del('seriesMonitorList' + fromId);	
+  });
+}
