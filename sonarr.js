@@ -425,7 +425,7 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   
   // set movie option to cache
   cache.set('seriesFolderId' + fromId, folder.folderId);
-  console.log("hSF: " + folderId)
+  console.log("hSF: " + folder.folderId)
   console.log(folder)
 
   console.log(fromId + ' requested to get monitor list');
