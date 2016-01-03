@@ -229,6 +229,7 @@ bot.on('message', function(msg) {
     if (currentState === undefined) {
       replyWithError(chatId, new Error('Try searching for a movie first with `/m movie name`'));
     } else {
+      console.log(currentState)
       switch(currentState) {
         case state.SERIES:
           var seriesDisplayName = msg.text;
@@ -240,11 +241,12 @@ bot.on('message', function(msg) {
           break;  
         case state.FOLDER:
           var seriesFolderName = msg.text;
+          console.log("seriesFolderName: " + seriesFolderName)
           handleSeriesFolder(chatId, fromId, seriesFolderName);
           break;
         case state.MONITOR:
           var seriesMonitor = msg.text;
-          console.log("seriesmonitor: "+seriesMonitor)
+          console.log("seriesmonitor: " + seriesMonitor)
           handleSeriesMonitor(chatId, fromId, seriesMonitor);
           break;            
         default:
