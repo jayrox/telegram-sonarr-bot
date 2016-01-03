@@ -229,7 +229,7 @@ bot.on('message', function(msg) {
     if (currentState === undefined) {
       replyWithError(chatId, new Error('Try searching for a movie first with `/m movie name`'));
     } else {
-      console.log(currentState)
+      console.log("currentstate: " + currentState)
       switch(currentState) {
         case state.SERIES:
           var seriesDisplayName = msg.text;
@@ -492,24 +492,28 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
     return item.id == seriesId;
   })[0];
 
+  console.log("series:")
   console.log(series)
 
   var profile = _.filter(profileList, function(item) {
     return item.id == profileId;
   })[0];
 
+  console.log("profile")
   console.log(profile)
 
   var folder = _.filter(folderList, function(item) {
     return item.id == folderId;
   })[0];
   
+  console.log("folder")
   console.log(folder)
 
   var monitor = _.filter(monitorList, function(item) {
     return item.type == monitorType;
   })[0];
   
+  console.log("monitor")
   console.log(monitor)
   
   var postOpts = {};
