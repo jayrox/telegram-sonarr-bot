@@ -244,6 +244,7 @@ bot.on('message', function(msg) {
           break;
         case state.MONITOR:
           var seriesMonitor = msg.text;
+          console.log("seriesmonitor: "+seriesMonitor)
           handleSeriesMonitor(chatId, fromId, seriesMonitor);
           break;            
         default:
@@ -479,22 +480,35 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   if (folderList === undefined || profileList === undefined || seriesList === undefined || monitorList === undefined) {
     bot.sendMessage(chatId, 'Oh no! Something went wrong, try searching again');
   }
+  
+  console.log("seriesListLen: " + seriesList.length)
+  console.log("profileListLen: " + profileList.length)
+  console.log("folderListLen: " + folderList.length)
+  console.log("monitorListLen: " + monitorList.length)
     
   var series = _.filter(seriesList, function(item) {
     return item.id == seriesId;
   })[0];
 
+  console.log(series)
+
   var profile = _.filter(profileList, function(item) {
     return item.id == profileId;
   })[0];
 
+  console.log(profile)
+
   var folder = _.filter(folderList, function(item) {
     return item.id == folderId;
   })[0];
+  
+  console.log(folder)
 
   var monitor = _.filter(monitorList, function(item) {
     return item.type == monitorType;
   })[0];
+  
+  console.log(monitor)
   
   var postOpts = {};
   postOpts.tvdbId = series.tvdbId;
