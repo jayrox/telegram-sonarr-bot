@@ -229,7 +229,6 @@ bot.on('message', function(msg) {
     if (currentState === undefined) {
       replyWithError(chatId, new Error('Try searching for a movie first with `/m movie name`'));
     } else {
-      console.log("currentstate: " + currentState)
       switch(currentState) {
         case state.SERIES:
           var seriesDisplayName = msg.text;
@@ -241,12 +240,10 @@ bot.on('message', function(msg) {
           break;  
         case state.FOLDER:
           var seriesFolderName = msg.text;
-          console.log("seriesFolderName: " + seriesFolderName)
           handleSeriesFolder(chatId, fromId, seriesFolderName);
           break;
         case state.MONITOR:
           var seriesMonitor = msg.text;
-          console.log("seriesmonitor: " + seriesMonitor)
           handleSeriesMonitor(chatId, fromId, seriesMonitor);
           break;            
         default:
@@ -425,8 +422,6 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   
   // set movie option to cache
   cache.set('seriesFolderId' + fromId, folder.folderId);
-  console.log("hSF: " + folder.folderId)
-  console.log(folder)
 
   console.log(fromId + ' requested to get monitor list');
 
@@ -485,42 +480,21 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
     bot.sendMessage(chatId, 'Oh no! Something went wrong, try searching again');
   }
   
-  console.log("seriesListLen: " + seriesList.length)
-  console.log("profileListLen: " + profileList.length)
-  console.log("folderListLen: " + folderList.length)
-  console.log("monitorListLen: " + monitorList.length)
-    
   var series = _.filter(seriesList, function(item) {
     return item.id == seriesId;
   })[0];
-
-  console.log("series:")
-  console.log(series)
 
   var profile = _.filter(profileList, function(item) {
     return item.id == profileId;
   })[0];
 
-  console.log("profile")
-  console.log(profile)
-
   var folder = _.filter(folderList, function(item) {
     return item.folderId == folderId;
   })[0];
-  
-  console.log("folderId: " + folderId)
-  console.log("folderList")
-  console.log(folderList)
-
-  console.log("folder")
-  console.log(folder)
 
   var monitor = _.filter(monitorList, function(item) {
     return item.type == monitorType;
   })[0];
-  
-  console.log("monitor")
-  console.log(monitor)
   
   var postOpts = {};
   postOpts.tvdbId = series.tvdbId;
