@@ -425,6 +425,8 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   
   // set movie option to cache
   cache.set('seriesFolderId' + fromId, folder.folderId);
+  console.log("hSF: " + folderId)
+  console.log(folder)
 
   console.log(fromId + ' requested to get monitor list');
 
@@ -506,6 +508,10 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
     return item.id == folderId;
   })[0];
   
+  console.log("folderId: " + folderId)
+  console.log("folderList")
+  console.log(folderList)
+
   console.log("folder")
   console.log(folder)
 
