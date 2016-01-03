@@ -222,9 +222,10 @@ bot.on('message', function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
   // If the message is a command, ignore it.
-  if(msg.text[0] != '/') {
+  
+  var currentState = cache.get('state' + fromId);
+  if(msg.text[0] != '/' || (currentState == state.FOLDER && msg.text[0] == '/')) {
     // Check cache to determine state, if cache empty prompt user to start a movie search
-    var currentState = cache.get('state' + fromId);
     if (currentState === undefined) {
       replyWithError(chatId, new Error('Try searching for a movie first with `/m movie name`'));
     } else {
@@ -382,7 +383,7 @@ function handleSeriesProfile(chatId, fromId, profileName) {
       keyboardList.push([n.path])
     });
     response.push('\nPlease select from the menu below.');
-
+    
     // set cache
     cache.set("seriesFolderList" + fromId, folderList);
     cache.set('state' + fromId, state.FOLDER);
