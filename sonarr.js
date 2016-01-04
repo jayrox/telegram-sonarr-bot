@@ -560,86 +560,6 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
 }
 
 /*
- * handle rss sync
- */
-bot.onText(/\/rss/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-  
-  var username = msg.from.username || msg.from.first_name;
-
-  if ( ! authorizedUser(fromId) ) {
-    console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
-    return;
-  }  
-
-  sonarr.post('command', { 'name': 'RssSync' })
-    .then(function() {
-      console.log(fromId + ' sent command for rss sync');
-      bot.sendMessage(chatId, 'RSS Sync command sent.');
-    })
-    .catch(function(err) {
-      replyWithError(chatId, err);
-    });
-});
-
-/*
- * handle refresh series
- */
-bot.onText(/\/refresh/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  var username = msg.from.username || msg.from.first_name;
-
-  if ( ! authorizedUser(fromId) ) {
-    console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
-    return;
-  }
-  
-  sonarr.post('command', { 'name': 'RefreshSeries' })
-    .then(function() {
-      console.log(fromId + ' sent command for refresh series');
-      bot.sendMessage(chatId, 'Refresh series command sent.');
-    })
-    .catch(function(err) {
-      replyWithError(chatId, err);
-    });
-});
-
-/*
- * handle clear command
- */
-bot.onText(/\/clear/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  var username = msg.from.username || msg.from.first_name;
-
-  if (!authorizedUser(fromId)) {
-    console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
-    return;
-  }
-  
-  clearCache(fromId)
-  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
-});
-
-function clearCache(fromId) {
- cache.del('seriesId' + fromId);
- cache.del('seriesList' + fromId);
- cache.del('seriesProfileId' + fromId);
- cache.del('seriesProfileList' + fromId);
- cache.del('seriesFolderId' + fromId);
- cache.del('seriesFolderList' + fromId);
- cache.del('seriesMonitorList' + fromId);
- cache.del('state' + fromId);
-}
-
-/*
  * save access control list
  */
 function saveACL() {
@@ -764,6 +684,14 @@ function handleRevokeUser(chatId, fromId, revokedUser) {
 bot.onText(/\/rss/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
+  
+  var username = msg.from.username || msg.from.first_name;
+
+  if ( ! authorizedUser(fromId) ) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }  
 
   sonarr.post('command', { 'name': 'RssSync' })
     .then(function() {
@@ -782,6 +710,14 @@ bot.onText(/\/refresh/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
+  var username = msg.from.username || msg.from.first_name;
+
+  if ( ! authorizedUser(fromId) ) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }
+  
   sonarr.post('command', { 'name': 'RefreshSeries' })
     .then(function() {
       console.log(fromId + ' sent command for refresh series');
@@ -798,7 +734,16 @@ bot.onText(/\/refresh/, function(msg) {
 bot.onText(/\/clear/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
-  clearCache(fromId);
+
+  var username = msg.from.username || msg.from.first_name;
+
+  if (!authorizedUser(fromId)) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }
+  
+  clearCache(fromId)
   bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
 });
 
