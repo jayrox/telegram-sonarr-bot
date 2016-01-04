@@ -5,8 +5,9 @@ var TelegramBot = require('node-telegram-bot-api');
 var NodeCache = require('node-cache');
 var fs = require('fs');
 var _ = require('lodash');
-
 var winston = require('winston');
+
+// add basic logging support
 var logger = new(winston.Logger)({
   transports: [
     new(winston.transports.Console)(),
@@ -33,6 +34,7 @@ try {
 } catch (e) {
   var config = {};
   config.telegram = {};
+  config.bot = {};
   config.sonarr = {};
 }
 
@@ -80,7 +82,6 @@ bot.onText(/\/start/, function(msg) {
   if (!authorizedUser(fromId)) {
     logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
-    return;
   }
 
   var response = [];
@@ -108,7 +109,6 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
   if (!authorizedUser(fromId)) {
     logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
-    return;
   }
 
   var seriesName = match[2];
@@ -197,7 +197,6 @@ bot.on('message', function(msg) {
       logger.info('Not Authorized: ' + fromId);
       var username = msg.from.username || msg.from.first_name;
       replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
-      return;
     }
 
     // Check cache to determine state, if cache empty prompt user to start a movie search
@@ -559,41 +558,6 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
 }
 
 /*
- * save access control list
- */
-function saveACL() {
-  var updatedAcl = JSON.stringify(acl);
-  fs.writeFile('./acl.json', updatedAcl, function(err) {
-    if (err) {
-      return logger.info(err);
-    }
-
-    logger.info('The access control list was saved!');
-  });
-}
-
-function authorizedUser(userId) {
-  var user = {
-    id: 0,
-    first_name: '',
-    username: ''
-  };
-
-  if (acl.allowedUsers.length > 0) {
-    user = _.filter(acl.allowedUsers, function(item) {
-      return item.id == userId;
-    })[0];
-  }
-
-  if ((user !== undefined && user.id > 0)) {
-    return true;
-  }
-
-  return false;
-}
-
-
-/*
  * handle authorization
  */
 
@@ -607,12 +571,11 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
     message.push('Error: Already authorized.');
     message.push('Type /start to begin.');
     bot.sendMessage(chatId, message.join('\n'));
-    return;
   }
 
   var userPass = match[1];
 
-  if (userPass === config.bot.password) {
+  if (userPass === (config.bot.password || process.env.BOT_PASSWORD)) {
     acl.allowedUsers.push(msg.from);
     saveACL();
 
@@ -627,20 +590,10 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
     bot.sendMessage(chatId, 'Error: Invalid password.');
   }
 
-  if (config.bot.owner > 0) {
-    bot.sendMessage(config.bot.owner, msg.from.username + ' has been granted access.');
+  if ((config.bot.owner || process.env.BOT_OWNER) > 0) {
+    bot.sendMessage(config.bot.owner || process.env.BOT_OWNER, msg.from.username + ' has been granted access.');
   }
 });
-
-function promptOwnerConfig(chatId, fromId) {
-  if (config.bot.owner === 0) {
-    var message = [];
-    message.push('Your User ID: ' + fromId);
-    message.push('Please add your User ID to the config file field labeled \'owner\'.');
-    message.push('Please restart the bot once this has been updated.');
-    bot.sendMessage(chatId, message.join('\n'));
-  }
-}
 
 bot.onText(/\/users/, function(msg) {
   var chatId = msg.chat.id;
@@ -650,9 +603,8 @@ bot.onText(/\/users/, function(msg) {
     promptOwnerConfig(chatId, fromId);
   }
 
-  if (config.bot.owner != fromId) {
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, 'Error: Only the owner can view users.');
-    return;
   }
 
   var response = ['*Allowed Users:*'];
@@ -669,16 +621,6 @@ bot.onText(/\/users/, function(msg) {
   bot.sendMessage(chatId, response.join('\n'), opts);
 });
 
-function handleRevokeUser(chatId, fromId, revokedUser) {
-
-  var user = _.filter(acl.allowedUsers, function(item) {
-    return item.username == revokedUser;
-  })[0];
-
-  acl.allowedUsers.splice(user.id - 1, 1);
-  saveACL();
-}
-
 /*
  * handle rss sync
  */
@@ -686,12 +628,8 @@ bot.onText(/\/rss/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
-  var username = msg.from.username || msg.from.first_name;
-
-  if (!authorizedUser(fromId)) {
-    logger.info('Not Authorized: ' + fromId);
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
-    return;
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, 'Error: Only the owner can issue RSS Sync.');
   }
 
   sonarr.post('command', {
@@ -715,10 +653,8 @@ bot.onText(/\/refresh/, function(msg) {
 
   var username = msg.from.username || msg.from.first_name;
 
-  if (!authorizedUser(fromId)) {
-    logger.info('Not Authorized: ' + fromId);
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
-    return;
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, 'Error: Only the owner can refresh series.');
   }
 
   sonarr.post('command', {
@@ -745,13 +681,65 @@ bot.onText(/\/clear/, function(msg) {
   if (!authorizedUser(fromId)) {
     logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
-    return;
   }
 
   clearCache(fromId);
 
   bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
 });
+
+/*
+ * save access control list
+ */
+function saveACL() {
+  var updatedAcl = JSON.stringify(acl);
+  fs.writeFile('./acl.json', updatedAcl, function(err) {
+    if (err) {
+      return logger.info(err);
+    }
+
+    logger.info('The access control list was saved!');
+  });
+}
+
+function handleRevokeUser(chatId, fromId, revokedUser) {
+  var user = _.filter(acl.allowedUsers, function(item) {
+    return item.username == revokedUser;
+  })[0];
+
+  acl.allowedUsers.splice(user.id - 1, 1);
+  saveACL();
+}
+
+function authorizedUser(userId) {
+  var user = {
+    id: 0,
+    first_name: '',
+    username: ''
+  };
+
+  if (acl.allowedUsers.length > 0) {
+    user = _.filter(acl.allowedUsers, function(item) {
+      return item.id == userId;
+    })[0];
+  }
+
+  if ((user !== undefined && user.id > 0)) {
+    return true;
+  }
+
+  return false;
+}
+
+function promptOwnerConfig(chatId, fromId) {
+  if ((config.bot.owner || process.env.BOT_OWNER) === 0) {
+    var message = [];
+    message.push('Your User ID: ' + fromId);
+    message.push('Please add your User ID to the config file field labeled \'owner\'.');
+    message.push('Please restart the bot once this has been updated.');
+    bot.sendMessage(chatId, message.join('\n'));
+  }
+}
 
 /*
  * Shared err message logic, primarily to handle removing the custom keyboard

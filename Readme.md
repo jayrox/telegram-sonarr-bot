@@ -9,11 +9,11 @@ For now, please make your bot username something unique. For example @fred-flint
 Getting Started
 ---------------
 
-### Prerequisites
+## Prerequisites
 - [Node.js](http://nodejs.org)
 - [Git](https://git-scm.com/downloads) (optional)
 
-### Installation
+## Installation
 
 ```bash
 # Clone the repository
@@ -38,6 +38,11 @@ Please refer to the Sonarr specific configuration below:
 - **username**: HTTP Auth username (default: empty)
 - **password**: HTTP Auth password (default: empty)
 
+### Bot authentication
+As of v0.1.8 this bot comes shipped with authentication. You'll need to set a password in `config.json` under the bot option. If you want the admin commands, fill in the owner field with your telegram user id.
+
+**Restart** the bot after making any changes to the `config.json` file.
+
 ```bash
 # Start the bot
 node sonarr.js
@@ -48,6 +53,8 @@ Alternatively you may use Docker to start the bot
 ```
 docker run --name telegram-sonarr-bot \
   -e TELEGRAM_BOTTOKEN=
+  -e BOT_PASSWORD=
+  -e BOT_OWNER=
   -e SONARR_HOST=
   -e SONARR_APIKEY=
   -e SONARR_PORT=
@@ -60,7 +67,12 @@ docker run --name telegram-sonarr-bot \
 
 **Prebuilt** Docker image for this bot can be found [here](https://hub.docker.com/r/subzero79/docker-telegram-sonarr-bot), thanks [@subzero79](https://github.com/subzero79)
 
-### Usage
+## Usage (commands)
+
+### First use
+Send the bot the `/auth` command with the password you created in `config.json`
+
+### Then
 
 Send the bot a message with the series name
 
@@ -77,13 +89,7 @@ Found 6 series:
 5) The Genius Game - 2013
 6) More Than A Game - The Story of Football
 
-/s [n] to continue...
-```
-
-Send the number of the series you want with the /s flag
-
-```
-/s 2
+Please select from the menu below.
 ```
 
 The bot will ask you for the quality
@@ -92,13 +98,7 @@ The bot will ask you for the quality
 Found 2 profiles:
 1) SD 2) HD
 
-/p [n] to continue...
-```
-
-Send the number of the profile
-
-```
-/p 2
+Please select from the menu below.
 ```
 
 The bot will ask you where the path you want the series to go
@@ -108,13 +108,7 @@ Found 2 folders:
 1) /Television/Airing/
 2) /Television/Archived/
 
-/f [n] to continue...
-```
-
-Send the number of the folder
-
-```
-/f 1
+Please select from the menu below.
 ```
 
 Lastly, the bot will ask you which seasons you would like to monitor/download
@@ -127,41 +121,21 @@ Select which seasons to monitor:
 4) latest
 5) first
 
-/m [n] to continue...
+Please select from the menu below.
 ```
 
 If everything goes well, you'll see a text from the bot saying the series was added.
 
-### Changelog
+### Admin commands
 
-#### v0.1.7
-- Added custom keyboard, thanks @jayrox
+* `/rss` perform an RSS Sync
+* `/refresh` refreshes all series
+* `/users` list users
 
-#### v0.1.6
-- `/q` now responds with link to series on thetvdb.com
+### Additional commands
+* `/clear` clear all previous commands and cache
 
-#### v0.1.5
-- Added command `/clear` to wipe all previous commands chain
-- More housekeeping
-
-#### v0.1.4
-- Sonarr lib is now on npm (you will need to run npm install if you are upgrading)
-- Updated a few dev things
-
-#### v0.1.3
-- Initial monitoring support, please report bugs if found...
-
-#### v0.1.2
-- Added Docker support
-
-#### v0.1.1
-- Added RSS Sync command `/rss`
-- Added Refresh All Series command `/refresh`
-
-#### v0.1.0
-- Initial release
-
-### License
+## License
 (The MIT License)
 
 Copyright (c) 2015 Devin Buhl <devin.kray@gmail.com>
