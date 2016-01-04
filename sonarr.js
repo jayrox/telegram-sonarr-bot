@@ -485,8 +485,6 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   postOpts.seriesType = 'standard';
   postOpts.qualityProfileId = profile.profileId;
 
-  logger.info(postOpts);
-
   var lastSeason = _.max(series.seasons, 'seasonNumber');
   var firstSeason = _.min(_.reject(series.seasons, {
     seasonNumber: 0
