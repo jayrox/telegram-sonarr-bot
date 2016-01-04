@@ -5,6 +5,20 @@ var TelegramBot = require('node-telegram-bot-api');
 var NodeCache = require('node-cache');
 var _ = require('lodash');
 
+class Response {
+  constructor(message, keyboard) {
+    this.message = message;
+    this.keyboard = keyboard;
+  }
+}
+
+var state = {
+  SERIES: 1,
+  PROFILE: 2,
+  FOLDER: 3,
+  MONITOR: 4
+};
+
 try {
   var config = require('./config.json');
 } catch (e) {
@@ -130,89 +144,9 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
       bot.sendMessage(chatId, response.message, opts);
     })
     .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
+      replyWithError(chatId, err);
     });
 });
-
-
-
-/*
- * handle rss sync
- */
-bot.onText(/\/rss/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  sonarr.post('command', { 'name': 'RssSync' })
-    .then(function() {
-      console.log(fromId + ' sent command for rss sync');
-      bot.sendMessage(chatId, 'RSS Sync command sent.');
-    })
-    .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
-    });
-});
-
-/*
- * handle refresh series
- */
-bot.onText(/\/refresh/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  sonarr.post('command', { 'name': 'RefreshSeries' })
-    .then(function() {
-      console.log(fromId + ' sent command for refresh series');
-      bot.sendMessage(chatId, 'Refresh series command sent.');
-    })
-    .catch(function(err) {
-      bot.sendMessage(chatId, 'Oh no! ' + err);
-    });
-});
-
-/*
- * handle clear command
- */
-bot.onText(/\/clear/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  cache.del('seriesId' + fromId);
-  cache.del('seriesList' + fromId);
-  cache.del('seriesProfileId' + fromId);
-  cache.del('seriesProfileList' + fromId);
-  cache.del('seriesFolderId' + fromId);
-  cache.del('seriesFolderList' + fromId);
-  cache.del('seriesMonitorList' + fromId);
-
-  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
-});
-
-/*
- * Shared err message logic, primarily to handle removing the custom keyboard
- */
-function replyWithError(chatId, err) {
-  bot.sendMessage(chatId, 'Oh no! ' + err, {
-    'parse_mode': 'Markdown',
-    'reply_markup': {
-      'hide_keyboard': false
-    }
-  });
-}
-
-class Response {
-    constructor(message, keyboard) {
-      this.message = message;
-      this.keyboard = keyboard;
-    }
-}
-
-var state = {
-  SERIES: 1,
-  PROFILE: 2,
-  FOLDER: 3,
-  MONITOR: 4
-};
 
 /*
  Captures any and all messages, filters out commands, handles profiles and movies
@@ -227,7 +161,7 @@ bot.on('message', function(msg) {
   if(msg.text[0] != '/' || (currentState == state.FOLDER && msg.text[0] == '/')) {
     // Check cache to determine state, if cache empty prompt user to start a movie search
     if (currentState === undefined) {
-      replyWithError(chatId, new Error('Try searching for a movie first with `/m movie name`'));
+      replyWithError(chatId, 'Try searching for a movie first with `/m movie name`');
     } else {
       switch(currentState) {
         case state.SERIES:
@@ -247,7 +181,7 @@ bot.on('message', function(msg) {
           handleSeriesMonitor(chatId, fromId, seriesMonitor);
           break;            
         default:
-          replyWithError(chatId, new Error('Unsure what\'s going on, use the `/clear` command and start over.'));
+          replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
       }
     }
   }
@@ -256,13 +190,15 @@ bot.on('message', function(msg) {
 function handleSeries(chatId, fromId, seriesDisplayName) {
   var seriesList = cache.get('seriesList'+fromId);
   if (seriesList === undefined) {
-    replyWithError(chatId, new Error('something went wrong, try searching again'));
+    throw new Error('something went wrong, try searching again');
   }
+  
   var series = _.filter(seriesList, function(item) {
     return item.keyboard_value == seriesDisplayName;
   })[0];
+  
   if(series === undefined){
-    replyWithError(chatId, new Error('Could not find the series with title "' + seriesDisplayName + '"'));
+    throw new Error('could not find the series with title ' + seriesDisplayName);
   }
   
   var seriesId = series.id;
@@ -333,21 +269,21 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
       bot.sendMessage(chatId, response.message, opts);
   })
   .catch(function(err) {
-    bot.sendMessage(chatId, "Oh no! " + err);
+    replyWithError(chatId, err);
   });
 }
 
 function handleSeriesProfile(chatId, fromId, profileName) {
   var profileList = cache.get('seriesProfileList' + fromId);
   if (profileList === undefined) {
-    replyWithError(chatId, new Error('Error: something went wrong, try searching again'));
+    throw new Error('something went wrong, try searching again');
   }
 
   var profile = _.filter(profileList, function(item) {
     return item.label == profileName;
   })[0];
   if(profile === undefined){
-    replyWithError(chatId, new Error('Could not find the profile "' + profileName + '"'));
+    throw new Error('could not find the profile ' + profileName);
   }
 
   var profileId = profile.id;
@@ -358,10 +294,11 @@ function handleSeriesProfile(chatId, fromId, profileName) {
   sonarr.get("rootfolder")
   .then(function (result) {
     if (!result.length) {
-      throw new Error("could not get folders, try searching again");
+      throw new Error('could not get folders, try searching again');
     }
+    
     if (cache.get("seriesList" + fromId) === undefined) {
-      throw new Error("could not get previous list, try searching again");
+      throw new Error('could not get previous list, try searching again');
     }
     return result;
   })
@@ -404,7 +341,7 @@ function handleSeriesProfile(chatId, fromId, profileName) {
       bot.sendMessage(chatId, response.message, opts);
   })
   .catch(function(err) {
-    bot.sendMessage(chatId, "Oh no! " + err);
+    replyWithError(chatId, err);
   });
 }
 
@@ -413,7 +350,7 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   var seriesList = cache.get('seriesList' + fromId);
   var folderList = cache.get("seriesFolderList" + fromId);
   if (seriesList === undefined || seriesId === undefined || folderList === undefined) {
-    replyWithError(chatId, new Error('Error: something went wrong, try searching again'));
+    replyWithError(chatId, 'something went wrong, try searching again');
   }
 
   var folder = _.filter(folderList, function(item) {
@@ -477,7 +414,7 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   var monitorList = cache.get('seriesMonitorList' + fromId);
 
   if (folderList === undefined || profileList === undefined || seriesList === undefined || monitorList === undefined) {
-    bot.sendMessage(chatId, 'Oh no! Something went wrong, try searching again');
+    throw new Error('something went wrong, try searching again');
   }
   
   var series = _.filter(seriesList, function(item) {
@@ -573,7 +510,7 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
     console.log(fromId + ' added series ' + series.title);
 
     if (!result) {
-      throw new Error("could not add series, try searching again.");
+      throw new Error('could not add series, try searching again.');
     }
 
     bot.sendMessage(chatId, 'Series `' + series.title + '` added', {
@@ -582,15 +519,75 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
     });
   })
   .catch(function(err) {
-    bot.sendMessage(chatId, "Oh no! " + err);
+    replyWithError(chatId, err);
   })
   .finally(function() {
-    cache.del('seriesId' + fromId);
-    cache.del('seriesList' + fromId);
-    cache.del('seriesProfileId' + fromId);
-    cache.del('seriesProfileList' + fromId);
-    cache.del('seriesFolderId' + fromId);
-    cache.del('seriesFolderList' + fromId);
-    cache.del('seriesMonitorList' + fromId);	
+    clearCache(fromId);
   });
+}
+
+/*
+ * handle rss sync
+ */
+bot.onText(/\/rss/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  sonarr.post('command', { 'name': 'RssSync' })
+    .then(function() {
+      console.log(fromId + ' sent command for rss sync');
+      bot.sendMessage(chatId, 'RSS Sync command sent.');
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
+});
+
+/*
+ * handle refresh series
+ */
+bot.onText(/\/refresh/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  sonarr.post('command', { 'name': 'RefreshSeries' })
+    .then(function() {
+      console.log(fromId + ' sent command for refresh series');
+      bot.sendMessage(chatId, 'Refresh series command sent.');
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
+});
+
+/*
+ * handle clear command
+ */
+bot.onText(/\/clear/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+  clearCache(fromId);
+  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
+});
+
+/*
+ * Shared err message logic, primarily to handle removing the custom keyboard
+ */
+function replyWithError(chatId, err) {
+  bot.sendMessage(chatId, 'Oh no! ' + err, {
+    'parse_mode': 'Markdown',
+    'reply_markup': {
+      'hide_keyboard': false
+    }
+  });
+}
+
+function clearCache(fromId) {
+  cache.del('seriesId' + fromId);
+  cache.del('seriesList' + fromId);
+  cache.del('seriesProfileId' + fromId);
+  cache.del('seriesProfileList' + fromId);
+  cache.del('seriesFolderId' + fromId);
+  cache.del('seriesFolderList' + fromId);
+  cache.del('seriesMonitorList' + fromId);
 }
