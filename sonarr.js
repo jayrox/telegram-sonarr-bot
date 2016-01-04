@@ -7,6 +7,9 @@ var fs = require('fs');
 var _ = require('lodash');
 var winston = require('winston');
 
+var config = require('./config.json') || {};
+var acl = require('./acl.json') || {};
+
 // add basic logging support
 var logger = new(winston.Logger)({
   transports: [
@@ -29,21 +32,6 @@ var state = {
   MONITOR: 4
 };
 
-try {
-  var config = require('./config.json');
-} catch (e) {
-  var config = {};
-  config.telegram = {};
-  config.bot = {};
-  config.sonarr = {};
-}
-
-try {
-  var acl = require('./acl.json');
-} catch (e) {
-  var acl = {};
-}
-
 var bot = new TelegramBot(process.env.TELEGRAM_BOTTOKEN || config.telegram.botToken, {
   polling: true
 });
@@ -65,7 +53,7 @@ var cache = new NodeCache();
  */
 bot.getMe()
   .then(function(msg) {
-    logger.info('Welcome to the sonarr bot %s!', msg.username);
+    logger.info('sonarr bot %s initialized', msg.username);
   })
   .catch(function(err) {
     throw new Error(err);
@@ -79,14 +67,13 @@ bot.onText(/\/start/, function(msg) {
   var username = msg.from.username || msg.from.first_name;
   var fromId = msg.from.id;
 
+  logger.info('user: %s, message: sent \'/start\' command', fromId);
+
   if (!authorizedUser(fromId)) {
-    logger.info('Not Authorized: ' + fromId);
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
+    replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
   }
 
-  var response = [];
-
-  response.push('Hello ' + username + ', use /q to search');
+  var response = ['Hello ' + username + ', use /q to search'];
   response.push('\n`/q [series name]` to continue...');
 
   var opts = {
@@ -106,8 +93,9 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 
   var username = msg.from.username || msg.from.first_name;
 
+  logger.info('user: %s, message: sent \'/query\' command', fromId);
+
   if (!authorizedUser(fromId)) {
-    logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
   }
 
@@ -124,17 +112,15 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
       return result;
     })
     .then(function(series) {
-      logger.info(fromId + ' requested to search for series ' + seriesName);
+      logger.info('user: %s, message: requested to search for series "%s"', fromId, seriesName);
 
       var seriesList = [];
       var keyboardList = [];
       var response = ['*Found ' + series.length + ' series:*'];
 
       _.forEach(series, function(n, key) {
-
         var id = key + 1;
         var keyboard_value = n.title + (n.year ? ' - ' + n.year : '');
-
 
         seriesList.push({
           'id': id,
@@ -156,6 +142,8 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
       });
 
       response.push('\nPlease select from the menu below...');
+
+      logger.info('user: %s, message: found the following series %s', fromId, keyboardList.join(', '));
 
       // set cache
       cache.set('seriesList' + fromId, seriesList);
@@ -188,41 +176,41 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 bot.on('message', function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
+  var message = msg.text;
 
   // If the message is a command, ignore it.
   var currentState = cache.get('state' + fromId);
-  if (msg.text[0] !== '/' || (currentState === state.FOLDER && msg.text[0] === '/')) {
+  if (message[0] !== '/' || (currentState === state.FOLDER && message[0] === '/')) {
 
+    // make sure the user has privileges
     if (!authorizedUser(fromId)) {
-      logger.info('Not Authorized: ' + fromId);
-      var username = msg.from.username || msg.from.first_name;
-      replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
+      replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
     }
 
-    // Check cache to determine state, if cache empty prompt user to start a movie search
+    // check cache to determine state, if cache empty prompt user to start a series search
     if (currentState === undefined) {
       replyWithError(chatId, 'Try searching for a movie first with `/q [series]`');
-    } else {
-      switch (currentState) {
-        case state.SERIES:
-          var seriesDisplayName = msg.text;
-          handleSeries(chatId, fromId, seriesDisplayName);
-          break;
-        case state.PROFILE:
-          var seriesProfileName = msg.text;
-          handleSeriesProfile(chatId, fromId, seriesProfileName);
-          break;
-        case state.FOLDER:
-          var seriesFolderName = msg.text;
-          handleSeriesFolder(chatId, fromId, seriesFolderName);
-          break;
-        case state.MONITOR:
-          var seriesMonitor = msg.text;
-          handleSeriesMonitor(chatId, fromId, seriesMonitor);
-          break;
-        default:
-          replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
-      }
+    }
+
+    switch (currentState) {
+      case state.SERIES:
+        logger.info('user: %s, message: choose the series %s', fromId, message);
+        handleSeries(chatId, fromId, message);
+        break;
+      case state.PROFILE:
+        logger.info('user: %s, message: choose the profile %s', fromId, message);
+        handleSeriesProfile(chatId, fromId, message);
+        break;
+      case state.FOLDER:
+        logger.info('user: %s, message: choose the folder %s', fromId, message);
+        handleSeriesFolder(chatId, fromId, message);
+        break;
+      case state.MONITOR:
+        logger.info('user: %s, message: choose the monitor type %s', fromId, message);
+        handleSeriesMonitor(chatId, fromId, message);
+        break;
+      default:
+        replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
     }
   }
 });
@@ -258,7 +246,7 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
       return result;
     })
     .then(function(profiles) {
-      logger.info(fromId + ' requested to get profiles list');
+      logger.info('user: %s, message: requested to get profile list', fromId);
 
       var profileList = [];
       var keyboardList = [];
@@ -288,6 +276,8 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
         keyboardList.push([keyboardRow[0]])
       }
       response.push('\nPlease select from the menu below.');
+
+      logger.info('user: %s, message: found the following profiles %s', fromId, keyboardList.join(', '));
 
       // set cache
       cache.set('seriesProfileList' + fromId, profileList);
@@ -343,7 +333,7 @@ function handleSeriesProfile(chatId, fromId, profileName) {
       return result;
     })
     .then(function(folders) {
-      logger.info(fromId + ' requested to get folder list');
+      logger.info('user: %s, message: requested to get folder list', fromId);
 
       var folderList = [];
       var keyboardList = [];
@@ -360,6 +350,8 @@ function handleSeriesProfile(chatId, fromId, profileName) {
         keyboardList.push([n.path]);
       });
       response.push('\nPlease select from the menu below.');
+
+      logger.info('user: %s, message: found the following folders %s', fromId, keyboardList.join(', '));
 
       // set cache
       cache.set('seriesFolderList' + fromId, folderList);
@@ -400,7 +392,7 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   // set movie option to cache
   cache.set('seriesFolderId' + fromId, folder.folderId);
 
-  logger.info(fromId + ' requested to get monitor list');
+  logger.info('user: %s, message: requested to get monitor list', fromId);
 
   var monitor = ['future', 'all', 'none', 'latest', 'first'];
   var monitorList = [];
@@ -427,6 +419,8 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   }
 
   response.push('\nPlease select from the menu below.');
+
+  logger.info('user: %s, message: found the following monitor types %s', fromId, keyboardList.join(', '));
 
   // set cache
   cache.set('seriesMonitorList' + fromId, monitorList);
@@ -538,7 +532,7 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
 
   sonarr.post('series', postOpts)
     .then(function(result) {
-      logger.info(fromId + ' added series ' + series.title);
+      logger.info('user: %s, message: added series %s', fromId, series.title);
 
       if (!result) {
         throw new Error('could not add series, try searching again.');
@@ -628,15 +622,17 @@ bot.onText(/\/rss/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
+  logger.info('user: %s, message: sent \'/rss\' command', fromId);
+
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, 'Error: Only the owner can issue RSS Sync.');
+    replyWithError(chatId, 'Only the owner can issue RSS Sync.');
   }
 
   sonarr.post('command', {
       'name': 'RssSync'
     })
     .then(function() {
-      logger.info(fromId + ' sent command for rss sync');
+      logger.info('user: %s, message: \'/rss\' command successfully executed', fromId);
       bot.sendMessage(chatId, 'RSS Sync command sent.');
     })
     .catch(function(err) {
@@ -651,17 +647,17 @@ bot.onText(/\/refresh/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
-  var username = msg.from.username || msg.from.first_name;
+  logger.info('user: %s, message: sent \'/refresh\' command', fromId);
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, 'Error: Only the owner can refresh series.');
+    replyWithError(chatId, 'Only the owner can refresh series.');
   }
 
   sonarr.post('command', {
       'name': 'RefreshSeries'
     })
     .then(function() {
-      logger.info(fromId + ' sent command for refresh series');
+      logger.info('user: %s, message: \'/refresh\' command successfully executed', fromId);
       bot.sendMessage(chatId, 'Refresh series command sent.');
     })
     .catch(function(err) {
@@ -676,16 +672,21 @@ bot.onText(/\/clear/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
-  var username = msg.from.username || msg.from.first_name;
+  logger.info('user: %s, message: sent \'/clear\' command', fromId);
 
   if (!authorizedUser(fromId)) {
-    logger.info('Not Authorized: ' + fromId);
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
+    replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
   }
+
+  logger.info('user: %s, message: \'/clear\' command successfully executed', fromId);
 
   clearCache(fromId);
 
-  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
+  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!', {
+    'reply_markup': {
+      'hide_keyboard': true
+    }
+  });
 });
 
 /*
