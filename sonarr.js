@@ -6,6 +6,14 @@ var NodeCache = require('node-cache');
 var fs = require('fs');
 var _ = require('lodash');
 
+var winston = require('winston');
+var logger = new(winston.Logger)({
+  transports: [
+    new(winston.transports.Console)(),
+    new(winston.transports.File)({filename: 'sonarr.log'})
+  ]
+});
+
 class Response {
   constructor(message, keyboard) {
     this.message = message;
@@ -55,7 +63,7 @@ var cache = new NodeCache();
  */
 bot.getMe()
   .then(function(msg) {
-    console.log('Welcome to the sonarr bot %s!', msg.username);
+    logger.info('Welcome to the sonarr bot %s!', msg.username);
   })
   .catch(function(err) {
     throw new Error(err);
@@ -70,7 +78,7 @@ bot.onText(/\/start/, function(msg) {
   var fromId = msg.from.id;
 
   if (!authorizedUser(fromId)) {
-    console.log('Not Authorized: ' + fromId);
+    logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
@@ -98,7 +106,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
   var username = msg.from.username || msg.from.first_name;
 
   if (!authorizedUser(fromId)) {
-    console.log('Not Authorized: ' + fromId);
+    logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
@@ -116,7 +124,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
       return result;
     })
     .then(function(series) {
-      console.log(fromId + ' requested to search for series ' + seriesName);
+      logger.info(fromId + ' requested to search for series ' + seriesName);
 
       var seriesList = [];
       var keyboardList = [];
@@ -186,7 +194,7 @@ bot.on('message', function(msg) {
   if (msg.text[0] !== '/' || (currentState === state.FOLDER && msg.text[0] === '/')) {
 
     if (!authorizedUser(fromId)) {
-      console.log('Not Authorized: ' + fromId);
+      logger.info('Not Authorized: ' + fromId);
       var username = msg.from.username || msg.from.first_name;
       replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
       return;
@@ -251,7 +259,7 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
       return result;
     })
     .then(function(profiles) {
-      console.log(fromId + ' requested to get profiles list');
+      logger.info(fromId + ' requested to get profiles list');
 
       var profileList = [];
       var keyboardList = [];
@@ -336,7 +344,7 @@ function handleSeriesProfile(chatId, fromId, profileName) {
       return result;
     })
     .then(function(folders) {
-      console.log(fromId + ' requested to get folder list');
+      logger.info(fromId + ' requested to get folder list');
 
       var folderList = [];
       var keyboardList = [];
@@ -393,7 +401,7 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   // set movie option to cache
   cache.set('seriesFolderId' + fromId, folder.folderId);
 
-  console.log(fromId + ' requested to get monitor list');
+  logger.info(fromId + ' requested to get monitor list');
 
   var monitor = ['future', 'all', 'none', 'latest', 'first'];
   var monitorList = [];
@@ -477,6 +485,8 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   postOpts.seriesType = 'standard';
   postOpts.qualityProfileId = profile.profileId;
 
+  logger.info(postOpts);
+
   var lastSeason = _.max(series.seasons, 'seasonNumber');
   var firstSeason = _.min(_.reject(series.seasons, {
     seasonNumber: 0
@@ -529,19 +539,9 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   // update seasons to be monitored
   postOpts.seasons = series.seasons;
 
-  sonarr.post('series', {
-      'tvdbId': series.tvdbId,
-      'title': series.title,
-      'titleSlug': series.titleSlug,
-      'seasons': series.seasons,
-      'rootFolderPath': folder.path,
-      'seasonFolder': true,
-      'monitored': false,
-      'seriesType': 'standard',
-      'qualityProfileId': profileId
-    })
+  sonarr.post('series', postOpts)
     .then(function(result) {
-      console.log(fromId + ' added series ' + series.title);
+      logger.info(fromId + ' added series ' + series.title);
 
       if (!result) {
         throw new Error('could not add series, try searching again.');
@@ -567,10 +567,10 @@ function saveACL() {
   var updatedAcl = JSON.stringify(acl);
   fs.writeFile('./acl.json', updatedAcl, function(err) {
     if (err) {
-      return console.log(err);
+      return logger.info(err);
     }
 
-    console.log('The access control list was saved!');
+    logger.info('The access control list was saved!');
   });
 }
 
@@ -691,7 +691,7 @@ bot.onText(/\/rss/, function(msg) {
   var username = msg.from.username || msg.from.first_name;
 
   if (!authorizedUser(fromId)) {
-    console.log('Not Authorized: ' + fromId);
+    logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
@@ -700,7 +700,7 @@ bot.onText(/\/rss/, function(msg) {
       'name': 'RssSync'
     })
     .then(function() {
-      console.log(fromId + ' sent command for rss sync');
+      logger.info(fromId + ' sent command for rss sync');
       bot.sendMessage(chatId, 'RSS Sync command sent.');
     })
     .catch(function(err) {
@@ -718,7 +718,7 @@ bot.onText(/\/refresh/, function(msg) {
   var username = msg.from.username || msg.from.first_name;
 
   if (!authorizedUser(fromId)) {
-    console.log('Not Authorized: ' + fromId);
+    logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
@@ -727,7 +727,7 @@ bot.onText(/\/refresh/, function(msg) {
       'name': 'RefreshSeries'
     })
     .then(function() {
-      console.log(fromId + ' sent command for refresh series');
+      logger.info(fromId + ' sent command for refresh series');
       bot.sendMessage(chatId, 'Refresh series command sent.');
     })
     .catch(function(err) {
@@ -745,13 +745,13 @@ bot.onText(/\/clear/, function(msg) {
   var username = msg.from.username || msg.from.first_name;
 
   if (!authorizedUser(fromId)) {
-    console.log('Not Authorized: ' + fromId);
+    logger.info('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
 
   clearCache(fromId);
-  
+
   bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
 });
 

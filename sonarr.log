@@ -1,0 +1,15 @@
+{"level":"info","message":"Welcome to the sonarr bot serenity_sonarr_bot!","timestamp":"2016-01-04T03:08:50.923Z"}
+{"level":"info","message":"Welcome to the sonarr bot serenity_sonarr_bot!","timestamp":"2016-01-04T03:09:20.304Z"}
+{"level":"info","message":"175997312 requested to search for series angry","timestamp":"2016-01-04T03:09:48.158Z"}
+{"level":"info","message":"175997312 requested to get profiles list","timestamp":"2016-01-04T03:09:53.593Z"}
+{"level":"info","message":"175997312 requested to get folder list","timestamp":"2016-01-04T03:09:56.823Z"}
+{"level":"info","message":"175997312 requested to get monitor list","timestamp":"2016-01-04T03:09:58.758Z"}
+{"tvdbId":76386,"title":"The Angry Beavers","titleSlug":"the-angry-beavers","rootFolderPath":"/river/Television/Archived/","seasonFolder":true,"monitored":true,"seriesType":"standard","qualityProfileId":2,"level":"info","message":"","timestamp":"2016-01-04T03:10:00.637Z"}
+{"level":"info","message":"175997312 added series The Angry Beavers","timestamp":"2016-01-04T03:10:00.825Z"}
+{"level":"info","message":"Welcome to the sonarr bot serenity_sonarr_bot!","timestamp":"2016-01-04T03:13:50.517Z"}
+{"level":"info","message":"175997312 requested to search for series angry","timestamp":"2016-01-04T03:13:57.534Z"}
+{"level":"info","message":"175997312 requested to get profiles list","timestamp":"2016-01-04T03:14:00.139Z"}
+{"level":"info","message":"175997312 requested to get folder list","timestamp":"2016-01-04T03:14:01.899Z"}
+{"level":"info","message":"175997312 requested to get monitor list","timestamp":"2016-01-04T03:14:03.654Z"}
+{"tvdbId":76386,"title":"The Angry Beavers","titleSlug":"the-angry-beavers","rootFolderPath":"/river/Television/Archived/","seasonFolder":true,"monitored":true,"seriesType":"standard","qualityProfileId":2,"level":"info","message":"","timestamp":"2016-01-04T03:14:04.868Z"}
+{"level":"info","message":"175997312 added series The Angry Beavers","timestamp":"2016-01-04T03:14:05.407Z"}
