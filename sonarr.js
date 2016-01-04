@@ -67,10 +67,10 @@ bot.getMe()
 bot.onText(/\/start/, function(msg) {
   var chatId = msg.chat.id;
   var username = msg.from.username || msg.from.first_name;
-
   var fromId = msg.from.id;
+
   if (!authorizedUser(fromId)) {
-    console.log("Not Authorized: " + fromId)
+    console.log('Not Authorized: ' + fromId);
     replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
@@ -97,15 +97,17 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 
   var username = msg.from.username || msg.from.first_name;
 
-  if ( ! authorizedUser(fromId) ) {
-    console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+  if (!authorizedUser(fromId)) {
+    console.log('Not Authorized: ' + fromId);
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
 
   var seriesName = match[2];
 
-  sonarr.get('series/lookup', { 'term': seriesName })
+  sonarr.get('series/lookup', {
+      'term': seriesName
+    })
     .then(function(result) {
       if (!result.length) {
         throw new Error('could not find ' + seriesName + ', try searching again');
@@ -124,7 +126,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 
         var id = key + 1;
         var keyboard_value = n.title + (n.year ? ' - ' + n.year : '');
-        
+
 
         seriesList.push({
           'id': id,
@@ -135,9 +137,9 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
           'seasons': n.seasons,
           'keyboard_value': keyboard_value
         });
-        
-        keyboardList.push([keyboard_value])
-        
+
+        keyboardList.push([keyboard_value]);
+
         response.push(
           '*' + id + '*) ' +
           '[' + n.title + '](http://thetvdb.com/?tab=series&id=' + n.tvdbId + ')' +
@@ -148,13 +150,13 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
       response.push('\nPlease select from the menu below...');
 
       // set cache
-      cache.set("seriesList" + fromId, seriesList);
+      cache.set('seriesList' + fromId, seriesList);
       cache.set('state' + fromId, state.SERIES);
 
       return new Response(response.join('\n'), keyboardList);
     })
     .then(function(response) {
-    var keyboard = {
+      var keyboard = {
         keyboard: response.keyboard,
         one_time_keyboard: true
       };
@@ -178,31 +180,31 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 bot.on('message', function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
+
   // If the message is a command, ignore it.
-  
   var currentState = cache.get('state' + fromId);
-  if(msg.text[0] != '/' || (currentState == state.FOLDER && msg.text[0] == '/')) {
-      
-    if ( ! authorizedUser(fromId) ) {
-        console.log("Not Authorized: " + fromId)
-        var username = msg.from.username || msg.from.first_name;
-        replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
-        return;
+  if (msg.text[0] !== '/' || (currentState === state.FOLDER && msg.text[0] === '/')) {
+
+    if (!authorizedUser(fromId)) {
+      console.log('Not Authorized: ' + fromId);
+      var username = msg.from.username || msg.from.first_name;
+      replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
+      return;
     }
-      
+
     // Check cache to determine state, if cache empty prompt user to start a movie search
     if (currentState === undefined) {
       replyWithError(chatId, 'Try searching for a movie first with `/q [series]`');
     } else {
-      switch(currentState) {
+      switch (currentState) {
         case state.SERIES:
           var seriesDisplayName = msg.text;
           handleSeries(chatId, fromId, seriesDisplayName);
-          break;  
+          break;
         case state.PROFILE:
           var seriesProfileName = msg.text;
           handleSeriesProfile(chatId, fromId, seriesProfileName);
-          break;  
+          break;
         case state.FOLDER:
           var seriesFolderName = msg.text;
           handleSeriesFolder(chatId, fromId, seriesFolderName);
@@ -210,7 +212,7 @@ bot.on('message', function(msg) {
         case state.MONITOR:
           var seriesMonitor = msg.text;
           handleSeriesMonitor(chatId, fromId, seriesMonitor);
-          break;            
+          break;
         default:
           replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
       }
@@ -219,74 +221,74 @@ bot.on('message', function(msg) {
 });
 
 function handleSeries(chatId, fromId, seriesDisplayName) {
-  var seriesList = cache.get('seriesList'+fromId);
+  var seriesList = cache.get('seriesList' + fromId);
   if (seriesList === undefined) {
     throw new Error('something went wrong, try searching again');
   }
-  
+
   var series = _.filter(seriesList, function(item) {
     return item.keyboard_value == seriesDisplayName;
   })[0];
-  
-  if(series === undefined){
+
+  if (series === undefined) {
     throw new Error('could not find the series with title ' + seriesDisplayName);
   }
-  
+
   var seriesId = series.id;
-  
-  cache.set('seriesId'+fromId, seriesId);
-  
-  sonarr.get("profile")
-  .then(function (result) {
-    if (!result.length) {
-      throw new Error("could not get profiles, try searching again");
-    }
-	
-	if (cache.get("seriesList" + fromId) === undefined) {
-      throw new Error("could not get previous series list, try searching again");
-    }
 
-    return result;
-  })
-  .then(function(profiles) {
-    console.log(fromId + ' requested to get profiles list');
+  cache.set('seriesId' + fromId, seriesId);
 
-    var profileList = [];
-    var keyboardList = [];
-    var keyboardRow = [];
-
-    var response = ['*Found ' + profiles.length + ' profiles:*'];
-    _.forEach(profiles, function(n, key) {
-	  profileList.push({
-	    "id": key + 1,
-	    "name": n.name,
-        "label": n.name,
-	    "profileId": n.id
-	  });
-
-      response.push('*' + (key + 1) + '*) ' + n.name);
-
-      // Profile names are short, put two on each custom
-      // keyboard row to reduce scrolling
-      keyboardRow.push(n.name);
-      if (keyboardRow.length == 2) {
-        keyboardList.push(keyboardRow);
-        keyboardRow = [];
+  sonarr.get('profile')
+    .then(function(result) {
+      if (!result.length) {
+        throw new Error('could not get profiles, try searching again');
       }
-    });
-      
-    if (keyboardRow.length == 1) {
-      keyboardList.push([keyboardRow[0]])
-    }
-    response.push('\nPlease select from the menu below.');
 
-    // set cache
-    cache.set("seriesProfileList" + fromId, profileList);
-    cache.set('state' + fromId, state.PROFILE);
+      if (cache.get('seriesList' + fromId) === undefined) {
+        throw new Error('could not get previous series list, try searching again');
+      }
 
-    return new Response(response.join('\n'), keyboardList);
-  })
-  .then(function(response) {
+      return result;
+    })
+    .then(function(profiles) {
+      console.log(fromId + ' requested to get profiles list');
+
+      var profileList = [];
+      var keyboardList = [];
+      var keyboardRow = [];
+
+      var response = ['*Found ' + profiles.length + ' profiles:*'];
+      _.forEach(profiles, function(n, key) {
+        profileList.push({
+          'id': key + 1,
+          'name': n.name,
+          'label': n.name,
+          'profileId': n.id
+        });
+
+        response.push('*' + (key + 1) + '*) ' + n.name);
+
+        // Profile names are short, put two on each custom
+        // keyboard row to reduce scrolling
+        keyboardRow.push(n.name);
+        if (keyboardRow.length === 2) {
+          keyboardList.push(keyboardRow);
+          keyboardRow = [];
+        }
+      });
+
+      if (keyboardRow.length == 1) {
+        keyboardList.push([keyboardRow[0]])
+      }
+      response.push('\nPlease select from the menu below.');
+
+      // set cache
+      cache.set('seriesProfileList' + fromId, profileList);
+      cache.set('state' + fromId, state.PROFILE);
+
+      return new Response(response.join('\n'), keyboardList);
+    })
+    .then(function(response) {
       var keyboard = {
         keyboard: response.keyboard,
         one_time_keyboard: true
@@ -298,10 +300,10 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
         'reply_markup': JSON.stringify(keyboard),
       };
       bot.sendMessage(chatId, response.message, opts);
-  })
-  .catch(function(err) {
-    replyWithError(chatId, err);
-  });
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
 }
 
 function handleSeriesProfile(chatId, fromId, profileName) {
@@ -313,52 +315,52 @@ function handleSeriesProfile(chatId, fromId, profileName) {
   var profile = _.filter(profileList, function(item) {
     return item.label == profileName;
   })[0];
-  if(profile === undefined){
+  if (profile === undefined) {
     throw new Error('could not find the profile ' + profileName);
   }
 
   var profileId = profile.id;
-  
+
   // set series option to cache
-  cache.set("seriesProfileId" + fromId, profileId);
-  
-  sonarr.get("rootfolder")
-  .then(function (result) {
-    if (!result.length) {
-      throw new Error('could not get folders, try searching again');
-    }
-    
-    if (cache.get("seriesList" + fromId) === undefined) {
-      throw new Error('could not get previous list, try searching again');
-    }
-    return result;
-  })
-  .then(function(folders) {
-    console.log(fromId + ' requested to get folder list');
+  cache.set('seriesProfileId' + fromId, profileId);
 
-    var folderList = [];
-    var keyboardList = [];
-    var response = ['*Found ' + folders.length + ' folders:*'];
-    _.forEach(folders, function(n, key) {
-	  folderList.push({
-	    "id": key + 1,
-	    "path": n.path,
-	    "folderId": n.id
-	  });
+  sonarr.get('rootfolder')
+    .then(function(result) {
+      if (!result.length) {
+        throw new Error('could not get folders, try searching again');
+      }
 
-	  response.push('*' + (key + 1) + '*) ' + n.path);
-      
-      keyboardList.push([n.path])
-    });
-    response.push('\nPlease select from the menu below.');
-    
-    // set cache
-    cache.set("seriesFolderList" + fromId, folderList);
-    cache.set('state' + fromId, state.FOLDER);
+      if (cache.get('seriesList' + fromId) === undefined) {
+        throw new Error('could not get previous list, try searching again');
+      }
+      return result;
+    })
+    .then(function(folders) {
+      console.log(fromId + ' requested to get folder list');
 
-    return new Response(response.join('\n'), keyboardList);
-  })
-  .then(function(response) {
+      var folderList = [];
+      var keyboardList = [];
+      var response = ['*Found ' + folders.length + ' folders:*'];
+      _.forEach(folders, function(n, key) {
+        folderList.push({
+          'id': key + 1,
+          'path': n.path,
+          'folderId': n.id
+        });
+
+        response.push('*' + (key + 1) + '*) ' + n.path);
+
+        keyboardList.push([n.path]);
+      });
+      response.push('\nPlease select from the menu below.');
+
+      // set cache
+      cache.set('seriesFolderList' + fromId, folderList);
+      cache.set('state' + fromId, state.FOLDER);
+
+      return new Response(response.join('\n'), keyboardList);
+    })
+    .then(function(response) {
       var keyboard = {
         keyboard: response.keyboard,
         one_time_keyboard: true
@@ -370,16 +372,16 @@ function handleSeriesProfile(chatId, fromId, profileName) {
         'reply_markup': JSON.stringify(keyboard),
       };
       bot.sendMessage(chatId, response.message, opts);
-  })
-  .catch(function(err) {
-    replyWithError(chatId, err);
-  });
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
 }
 
 function handleSeriesFolder(chatId, fromId, folderName) {
   var seriesId = cache.get('seriesId' + fromId);
   var seriesList = cache.get('seriesList' + fromId);
-  var folderList = cache.get("seriesFolderList" + fromId);
+  var folderList = cache.get('seriesFolderList' + fromId);
   if (seriesList === undefined || seriesId === undefined || folderList === undefined) {
     replyWithError(chatId, 'something went wrong, try searching again');
   }
@@ -387,7 +389,7 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   var folder = _.filter(folderList, function(item) {
     return item.path == folderName;
   })[0];
-  
+
   // set movie option to cache
   cache.set('seriesFolderId' + fromId, folder.folderId);
 
@@ -405,15 +407,16 @@ function handleSeriesFolder(chatId, fromId, folderName) {
     });
 
     response.push('*' + (key + 1) + '*) ' + n);
-    
+
     keyboardRow.push(n);
     if (keyboardRow.length == 2) {
       keyboardList.push(keyboardRow);
       keyboardRow = [];
     }
   });
+
   if (keyboardRow.length == 1) {
-    keyboardList.push([keyboardRow[0]])
+    keyboardList.push([keyboardRow[0]]);
   }
 
   response.push('\nPlease select from the menu below.');
@@ -447,7 +450,7 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   if (folderList === undefined || profileList === undefined || seriesList === undefined || monitorList === undefined) {
     throw new Error('something went wrong, try searching again');
   }
-  
+
   var series = _.filter(seriesList, function(item) {
     return item.id == seriesId;
   })[0];
@@ -525,70 +528,70 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
 
   // update seasons to be monitored
   postOpts.seasons = series.seasons;
-    
-  sonarr.post("series", {
-    "tvdbId": series.tvdbId,
-	 "title": series.title,
-	 "titleSlug": series.titleSlug,
-	 "seasons": series.seasons,
-	 "rootFolderPath": folder.path,
-	 "seasonFolder": true,
-	 "monitored": false,
-	 "seriesType": "standard",
-	 "qualityProfileId": profileId
-  })
-  .then(function(result) {
-    console.log(fromId + ' added series ' + series.title);
 
-    if (!result) {
-      throw new Error('could not add series, try searching again.');
-    }
+  sonarr.post('series', {
+      'tvdbId': series.tvdbId,
+      'title': series.title,
+      'titleSlug': series.titleSlug,
+      'seasons': series.seasons,
+      'rootFolderPath': folder.path,
+      'seasonFolder': true,
+      'monitored': false,
+      'seriesType': 'standard',
+      'qualityProfileId': profileId
+    })
+    .then(function(result) {
+      console.log(fromId + ' added series ' + series.title);
 
-    bot.sendMessage(chatId, 'Series `' + series.title + '` added', {
-      "selective": 2,
-      "parse_mode": "Markdown"
+      if (!result) {
+        throw new Error('could not add series, try searching again.');
+      }
+
+      bot.sendMessage(chatId, 'Series `' + series.title + '` added', {
+        'selective': 2,
+        'parse_mode': 'Markdown'
+      });
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    })
+    .finally(function() {
+      clearCache(fromId);
     });
-  })
-  .catch(function(err) {
-    replyWithError(chatId, err);
-  })
-  .finally(function() {
-    clearCache(fromId);
-  });
 }
 
 /*
  * save access control list
  */
 function saveACL() {
-    var updatedAcl = JSON.stringify(acl);
-    fs.writeFile("./acl.json", updatedAcl, function(err) {
-        if(err) {
-            return console.log(err);
-        }
+  var updatedAcl = JSON.stringify(acl);
+  fs.writeFile('./acl.json', updatedAcl, function(err) {
+    if (err) {
+      return console.log(err);
+    }
 
-        console.log("The access control list was saved!");
-    });     
+    console.log('The access control list was saved!');
+  });
 }
 
 function authorizedUser(userId) {
-    var user = {
-        id: 0,
-        first_name: '',
-        username: ''
-    }
+  var user = {
+    id: 0,
+    first_name: '',
+    username: ''
+  };
 
-    if (acl.allowedUsers.length > 0) {
-        user = _.filter(acl.allowedUsers, function(item) {
-            return item.id == userId;
-        })[0];
-    }
-   
-    if ((user !== undefined && user.id > 0)) {
-        return true
-    }
+  if (acl.allowedUsers.length > 0) {
+    user = _.filter(acl.allowedUsers, function(item) {
+      return item.id == userId;
+    })[0];
+  }
 
-    return false;
+  if ((user !== undefined && user.id > 0)) {
+    return true;
+  }
+
+  return false;
 }
 
 
@@ -597,72 +600,74 @@ function authorizedUser(userId) {
  */
 
 bot.onText(/\/auth (.+)/, function(msg, match) {
-    var chatId = msg.chat.id;
-    var fromId = msg.from.id;
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
 
-    var message = [];
+  var message = [];
 
-    if ( authorizedUser(fromId) ) {
-        message.push("Error: Already authorized.")
-        message.push("Type /start to begin.")
-        bot.sendMessage(chatId, message.join('\n'));
-        return
+  if (authorizedUser(fromId)) {
+    message.push('Error: Already authorized.');
+    message.push('Type /start to begin.');
+    bot.sendMessage(chatId, message.join('\n'));
+    return;
+  }
+
+  var userPass = match[1];
+
+  if (userPass === config.bot.password) {
+    acl.allowedUsers.push(msg.from);
+    saveACL();
+
+    if (acl.allowedUsers.length == 1) {
+      promptOwnerConfig(chatId, fromId);
     }
 
-    var userPass = match[1];
+    message.push('You have been authorized.');
+    message.push('Type /start to begin.');
+    bot.sendMessage(chatId, message.join('\n'));
+  } else {
+    bot.sendMessage(chatId, 'Error: Invalid password.');
+  }
 
-    if (userPass === config.bot.password) {        
-        acl.allowedUsers.push(msg.from)
-        saveACL();
-
-        if (acl.allowedUsers.length == 1) {
-            promptOwnerConfig(chatId, fromId)
-        }
-
-        message.push("You have been authorized.")
-        message.push("Type /start to begin.")
-        bot.sendMessage(chatId, message.join('\n'))
-    } else {
-        bot.sendMessage(chatId, "Error: Invalid password.")
-    }
-    
-    if (config.bot.owner > 0 ) {
-        bot.sendMessage(config.bot.owner, msg.from.username + " has been granted access.")
-    }
+  if (config.bot.owner > 0) {
+    bot.sendMessage(config.bot.owner, msg.from.username + ' has been granted access.');
+  }
 });
 
 function promptOwnerConfig(chatId, fromId) {
-    if (config.bot.owner === 0) {
-        var message = []
-        message.push("Your User ID: " + fromId)
-        message.push("Please add your User ID to the config file field labeled 'owner'.")
-        message.push("Please restart the bot once this has been updated.")
-        bot.sendMessage(chatId, message.join('\n'))
-    }
+  if (config.bot.owner === 0) {
+    var message = [];
+    message.push('Your User ID: ' + fromId);
+    message.push('Please add your User ID to the config file field labeled \'owner\'.');
+    message.push('Please restart the bot once this has been updated.');
+    bot.sendMessage(chatId, message.join('\n'));
+  }
 }
 
 bot.onText(/\/users/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
-  
+
   if (authorizedUser(fromId)) {
-    promptOwnerConfig(chatId, fromId)
+    promptOwnerConfig(chatId, fromId);
   }
 
   if (config.bot.owner != fromId) {
-    replyWithError(chatId, 'Error: Only the owner can view users.')
-    return
+    replyWithError(chatId, 'Error: Only the owner can view users.');
+    return;
   }
 
   var response = ['*Allowed Users:*'];
   _.forEach(acl.allowedUsers, function(n, key) {
     response.push('*' + (key + 1) + '*) ' + n.username);
   });
+
   var opts = {
     'disable_web_page_preview': true,
     'parse_mode': 'Markdown',
     'selective': 2,
   };
+
   bot.sendMessage(chatId, response.join('\n'), opts);
 });
 
@@ -671,8 +676,8 @@ function handleRevokeUser(chatId, fromId, revokedUser) {
   var user = _.filter(acl.allowedUsers, function(item) {
     return item.username == revokedUser;
   })[0];
-  
-  acl.allowedUsers.splice(user.id -1, 1)
+
+  acl.allowedUsers.splice(user.id - 1, 1);
   saveACL();
 }
 
@@ -682,16 +687,18 @@ function handleRevokeUser(chatId, fromId, revokedUser) {
 bot.onText(/\/rss/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
-  
+
   var username = msg.from.username || msg.from.first_name;
 
-  if ( ! authorizedUser(fromId) ) {
-    console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+  if (!authorizedUser(fromId)) {
+    console.log('Not Authorized: ' + fromId);
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
-  }  
+  }
 
-  sonarr.post('command', { 'name': 'RssSync' })
+  sonarr.post('command', {
+      'name': 'RssSync'
+    })
     .then(function() {
       console.log(fromId + ' sent command for rss sync');
       bot.sendMessage(chatId, 'RSS Sync command sent.');
@@ -710,13 +717,15 @@ bot.onText(/\/refresh/, function(msg) {
 
   var username = msg.from.username || msg.from.first_name;
 
-  if ( ! authorizedUser(fromId) ) {
-    console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+  if (!authorizedUser(fromId)) {
+    console.log('Not Authorized: ' + fromId);
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
-  
-  sonarr.post('command', { 'name': 'RefreshSeries' })
+
+  sonarr.post('command', {
+      'name': 'RefreshSeries'
+    })
     .then(function() {
       console.log(fromId + ' sent command for refresh series');
       bot.sendMessage(chatId, 'Refresh series command sent.');
@@ -736,12 +745,13 @@ bot.onText(/\/clear/, function(msg) {
   var username = msg.from.username || msg.from.first_name;
 
   if (!authorizedUser(fromId)) {
-    console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    console.log('Not Authorized: ' + fromId);
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
+
+  clearCache(fromId);
   
-  clearCache(fromId)
   bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
 });
 
