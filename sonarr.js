@@ -7,8 +7,20 @@ var fs = require('fs');
 var _ = require('lodash');
 var winston = require('winston');
 
-var config = require('./config.json') || {};
-var acl = require('./acl.json') || {};
+try {
+  var config = require('./config.json');
+} catch (err) {
+  var config = {};
+  config.telegram = {};
+  config.bot = {};
+  config.sonarr = {};
+}
+
+try {
+  var acl = require('./acl.json');
+} catch (err) {
+  createACL();
+}
 
 // add basic logging support
 var logger = new(winston.Logger)({
@@ -95,16 +107,13 @@ bot.onText(/\/start/, function(msg) {
 bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
-
-  var username = msg.from.username || msg.from.first_name;
+  var seriesName = match[2];
 
   logger.info('user: %s, message: sent \'/query\' command', fromId);
 
   if (!authorizedUser(fromId)) {
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
+    replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
   }
-
-  var seriesName = match[2];
 
   sonarr.get('series/lookup', {
       'term': seriesName
@@ -278,7 +287,7 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
       });
 
       if (keyboardRow.length == 1) {
-        keyboardList.push([keyboardRow[0]])
+        keyboardList.push([keyboardRow[0]]);
       }
       response.push('\nPlease select from the menu below.');
 
@@ -577,9 +586,9 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
 
   if (userPass === (config.bot.password || process.env.BOT_PASSWORD)) {
     acl.allowedUsers.push(msg.from);
-    saveACL();
+    updateACL();
 
-    if (acl.allowedUsers.length == 1) {
+    if (acl.allowedUsers.length === 1) {
       promptOwnerConfig(chatId, fromId);
     }
 
@@ -701,24 +710,26 @@ bot.onText(/\/clear/, function(msg) {
 /*
  * save access control list
  */
-function saveACL() {
+function updateACL() {
   var updatedAcl = JSON.stringify(acl);
   fs.writeFile('./acl.json', updatedAcl, function(err) {
     if (err) {
-      return logger.info(err);
+      throw new Error(err);
     }
 
-    logger.info('The access control list was saved!');
+    logger.info('the access control list was updated!');
   });
 }
 
-function handleRevokeUser(chatId, fromId, revokedUser) {
-  var user = _.filter(acl.allowedUsers, function(item) {
-    return item.username == revokedUser;
-  })[0];
+function createACL() {
+  fs.writeFile('./acl.json', '{"allowedUsers":[]}', function(err) {
+    if (err) {
+      throw new Error(err);
+    }
 
-  acl.allowedUsers.splice(user.id - 1, 1);
-  saveACL();
+    logger.info('the access control list was created, please restart the bot!');
+    process.exit(1);
+  });
 }
 
 function authorizedUser(userId) {
@@ -743,8 +754,7 @@ function authorizedUser(userId) {
 
 function promptOwnerConfig(chatId, fromId) {
   if ((config.bot.owner || process.env.BOT_OWNER) === 0) {
-    var message = [];
-    message.push('Your User ID: ' + fromId);
+    var message = ['Your User ID: ' + fromId];
     message.push('Please add your User ID to the config file field labeled \'owner\'.');
     message.push('Please restart the bot once this has been updated.');
     bot.sendMessage(chatId, message.join('\n'));

@@ -1,5 +1,14 @@
 ## Changelog
 
+### v0.1.9
+- Fixed issue with keyboard not clearing when issuing `/clear` command
+- Create ACL file when it doesn't exist, you will be told to restart the bot if it doesn't exist
+- renamed function saveACL to updateACL
+- created createACL function
+- Added more logging
+- More linter fixes
+- More housekeeping
+
 ### v0.1.8
 - Added basic auth to the bot, thanks @jayrox
 - Added basic logging (please rerun `npm install`)
