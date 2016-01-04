@@ -557,7 +557,7 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   .finally(function() {
     clearCache(fromId);
   });
-});
+}
 
 /*
  * handle rss sync
