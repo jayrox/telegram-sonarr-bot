@@ -13,8 +13,13 @@ var acl = require('./acl.json') || {};
 // add basic logging support
 var logger = new(winston.Logger)({
   transports: [
-    new(winston.transports.Console)(),
-    new(winston.transports.File)({filename: 'sonarr.log'})
+    new(winston.transports.Console)({
+      json: false,
+      timestamp: true,
+      prettyPrint: true,
+      colorize: true
+    }),
+    new(winston.transports.File)({ filename: 'sonarr.log', json: true })
   ]
 });
 
@@ -554,7 +559,6 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
 /*
  * handle authorization
  */
-
 bot.onText(/\/auth (.+)/, function(msg, match) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
@@ -562,7 +566,7 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
   var message = [];
 
   if (authorizedUser(fromId)) {
-    message.push('Error: Already authorized.');
+    message.push('Already authorized.');
     message.push('Type /start to begin.');
     bot.sendMessage(chatId, message.join('\n'));
   }
@@ -581,7 +585,7 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
     message.push('Type /start to begin.');
     bot.sendMessage(chatId, message.join('\n'));
   } else {
-    bot.sendMessage(chatId, 'Error: Invalid password.');
+    bot.sendMessage(chatId, 'Invalid password.');
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) > 0) {
@@ -589,6 +593,9 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
   }
 });
 
+/*
+ * handle users
+ */
 bot.onText(/\/users/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
@@ -598,7 +605,7 @@ bot.onText(/\/users/, function(msg) {
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, 'Error: Only the owner can view users.');
+    replyWithError(chatId, 'Only the owner can view users.');
   }
 
   var response = ['*Allowed Users:*'];
