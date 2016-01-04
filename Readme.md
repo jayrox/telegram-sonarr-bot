@@ -4,8 +4,6 @@ Bot which lets you or others add series to [Sonarr](https://sonarr.tv/) via the 
 
 Contact [@BotFather](http://telegram.me/BotFather) on Telegram to create and get a bot token.
 
-For now, please make your bot username something unique. For example @fred-flintstone-sonarr-bot or something...
-
 Getting Started
 ---------------
 
@@ -28,7 +26,11 @@ npm install
 
 Then copy `config.json.template` to `config.json` and fill in the values.
 
-Please refer to the Sonarr specific configuration below:
+- **botToken** your Telegram Bot token
+- **password** the password to access the bot
+- **owner** your Telegram user ID. (you can fill this in later)
+
+Sonarr specific configuration:
 
 - **hostname**: hostname where Sonarr runs (required)
 - **apiKey**: Your API to access Sonarr (required)
@@ -38,41 +40,19 @@ Please refer to the Sonarr specific configuration below:
 - **username**: HTTP Auth username (default: empty)
 - **password**: HTTP Auth password (default: empty)
 
-### Bot authentication
-As of v0.1.8 this bot comes shipped with authentication. You'll need to set a password in `config.json` under the bot option. If you want the admin commands, fill in the owner field with your telegram user id.
-
-**Restart** the bot after making any changes to the `config.json` file.
+**Important note**: Restart the bot after making any changes to the `config.json` file.
 
 ```bash
 # Start the bot
 node sonarr.js
 ```
 
-### Docker
-Alternatively you may use Docker to start the bot
-```
-docker run --name telegram-sonarr-bot \
-  -e TELEGRAM_BOTTOKEN=
-  -e BOT_PASSWORD=
-  -e BOT_OWNER=
-  -e SONARR_HOST=
-  -e SONARR_APIKEY=
-  -e SONARR_PORT=
-  -e SONARR_URLBASE=
-  -e SONARR_SSL=
-  -e SONARR_USERNAME=
-  -e SONARR_PASSWORD=
-  telegram-sonarr-bot
-```
-
-**Prebuilt** Docker image for this bot can be found [here](https://hub.docker.com/r/subzero79/docker-telegram-sonarr-bot), thanks [@subzero79](https://github.com/subzero79)
-
 ## Usage (commands)
 
 ### First use
 Send the bot the `/auth` command with the password you created in `config.json`
 
-### Then
+### Adding a series
 
 Send the bot a message with the series name
 
@@ -126,14 +106,32 @@ Please select from the menu below.
 
 If everything goes well, you'll see a text from the bot saying the series was added.
 
-### Admin commands
+### Additional commands
+* `/clear` clear all previous commands and cache
 
+### Admin commands
 * `/rss` perform an RSS Sync
 * `/refresh` refreshes all series
 * `/users` list users
 
-### Additional commands
-* `/clear` clear all previous commands and cache
+## Docker
+Alternatively you may use Docker to start the bot
+```
+docker run --name telegram-sonarr-bot \
+  -e TELEGRAM_BOTTOKEN=
+  -e BOT_PASSWORD=
+  -e BOT_OWNER=
+  -e SONARR_HOST=
+  -e SONARR_APIKEY=
+  -e SONARR_PORT=
+  -e SONARR_URLBASE=
+  -e SONARR_SSL=
+  -e SONARR_USERNAME=
+  -e SONARR_PASSWORD=
+  telegram-sonarr-bot
+```
+
+**Prebuilt** Docker image for this bot can be found [here](https://hub.docker.com/r/subzero79/docker-telegram-sonarr-bot), thanks [@subzero79](https://github.com/subzero79)
 
 ## License
 (The MIT License)
