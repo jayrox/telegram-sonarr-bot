@@ -3,6 +3,7 @@
 var SonarrAPI = require('sonarr-api');
 var TelegramBot = require('node-telegram-bot-api');
 var NodeCache = require('node-cache');
+var fs = require('fs');
 var _ = require('lodash');
 
 class Response {
@@ -25,6 +26,13 @@ try {
   var config = {};
   config.telegram = {};
   config.sonarr = {};
+}
+
+try {
+  var acl = require('./acl.json');
+} catch (e) {
+    console.log(e)
+  var acl = {};
 }
 
 var bot = new TelegramBot(process.env.TELEGRAM_BOTTOKEN || config.telegram.botToken, {
@@ -61,6 +69,14 @@ bot.onText(/\/start/, function(msg) {
   var chatId = msg.chat.id;
   var username = msg.from.username || msg.from.first_name;
 
+  var fromId = msg.from.id;
+  if ( ! authorizedUser(fromId) ) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }
+
+
   var response = [];
 
   response.push('Hello ' + username + ', use /q to search');
@@ -80,6 +96,15 @@ bot.onText(/\/start/, function(msg) {
 bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
+
+  var username = msg.from.username || msg.from.first_name;
+
+  if ( ! authorizedUser(fromId) ) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }
+
   var seriesName = match[2];
 
   sonarr.get('series/lookup', { 'term': seriesName })
@@ -159,9 +184,17 @@ bot.on('message', function(msg) {
   
   var currentState = cache.get('state' + fromId);
   if(msg.text[0] != '/' || (currentState == state.FOLDER && msg.text[0] == '/')) {
+      
+    if ( ! authorizedUser(fromId) ) {
+        console.log("Not Authorized: " + fromId)
+        var username = msg.from.username || msg.from.first_name;
+        replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+        return;
+    }
+      
     // Check cache to determine state, if cache empty prompt user to start a movie search
     if (currentState === undefined) {
-      replyWithError(chatId, 'Try searching for a movie first with `/m movie name`');
+      replyWithError(chatId, 'Try searching for a movie first with `/q [series]`');
     } else {
       switch(currentState) {
         case state.SERIES:
@@ -432,7 +465,7 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   var monitor = _.filter(monitorList, function(item) {
     return item.type == monitorType;
   })[0];
-  
+
   var postOpts = {};
   postOpts.tvdbId = series.tvdbId;
   postOpts.title = series.title;
@@ -524,6 +557,205 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   .finally(function() {
     clearCache(fromId);
   });
+});
+
+/*
+ * handle rss sync
+ */
+bot.onText(/\/rss/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+  
+  var username = msg.from.username || msg.from.first_name;
+
+  if ( ! authorizedUser(fromId) ) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }  
+
+  sonarr.post('command', { 'name': 'RssSync' })
+    .then(function() {
+      console.log(fromId + ' sent command for rss sync');
+      bot.sendMessage(chatId, 'RSS Sync command sent.');
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
+});
+
+/*
+ * handle refresh series
+ */
+bot.onText(/\/refresh/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  var username = msg.from.username || msg.from.first_name;
+
+  if ( ! authorizedUser(fromId) ) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }
+  
+  sonarr.post('command', { 'name': 'RefreshSeries' })
+    .then(function() {
+      console.log(fromId + ' sent command for refresh series');
+      bot.sendMessage(chatId, 'Refresh series command sent.');
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
+});
+
+/*
+ * handle clear command
+ */
+bot.onText(/\/clear/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  var username = msg.from.username || msg.from.first_name;
+
+  if (!authorizedUser(fromId)) {
+    console.log("Not Authorized: " + fromId)
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    return;
+  }
+  
+  clearCache(fromId)
+  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!');
+});
+
+function clearCache(fromId) {
+ cache.del('seriesId' + fromId);
+ cache.del('seriesList' + fromId);
+ cache.del('seriesProfileId' + fromId);
+ cache.del('seriesProfileList' + fromId);
+ cache.del('seriesFolderId' + fromId);
+ cache.del('seriesFolderList' + fromId);
+ cache.del('seriesMonitorList' + fromId);
+ cache.del('state' + fromId);
+}
+
+/*
+ * save access control list
+ */
+function saveACL() {
+    var updatedAcl = JSON.stringify(acl);
+    fs.writeFile("./acl.json", updatedAcl, function(err) {
+        if(err) {
+            return console.log(err);
+        }
+
+        console.log("The access control list was saved!");
+    });     
+}
+
+function authorizedUser(userId) {
+    var user = {
+        id: 0,
+        first_name: '',
+        username: ''
+    }
+
+    if (acl.allowedUsers.length > 0) {
+        user = _.filter(acl.allowedUsers, function(item) {
+            return item.id == userId;
+        })[0];
+    }
+   
+    if ((user !== undefined && user.id > 0)) {
+        return true
+    }
+
+    return false;
+}
+
+
+/*
+ * handle authorization
+ */
+
+bot.onText(/\/auth (.+)/, function(msg, match) {
+    var chatId = msg.chat.id;
+    var fromId = msg.from.id;
+
+    var message = [];
+
+    if ( authorizedUser(fromId) ) {
+        message.push("Error: Already authorized.")
+        message.push("Type /start to begin.")
+        bot.sendMessage(chatId, message.join('\n'));
+        return
+    }
+
+    var userPass = match[1];
+
+    if (userPass === config.bot.password) {        
+        acl.allowedUsers.push(msg.from)
+        saveACL();
+
+        if (acl.allowedUsers.length == 1) {
+            promptOwnerConfig(chatId, fromId)
+        }
+
+        message.push("You have been authorized.")
+        message.push("Type /start to begin.")
+        bot.sendMessage(chatId, message.join('\n'))
+    } else {
+        bot.sendMessage(chatId, "Error: Invalid password.")
+    }
+    
+    if (config.bot.owner > 0 ) {
+        bot.sendMessage(config.bot.owner, msg.from.username + " has been granted access.")
+    }
+});
+
+function promptOwnerConfig(chatId, fromId) {
+    if (config.bot.owner === 0) {
+        var message = []
+        message.push("Your User ID: " + fromId)
+        message.push("Please add your User ID to the config file field labeled 'owner'.")
+        message.push("Please restart the bot once this has been updated.")
+        bot.sendMessage(chatId, message.join('\n'))
+    }
+}
+
+bot.onText(/\/users/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+  
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId)
+  }
+
+  if (config.bot.owner != fromId) {
+    replyWithError(chatId, 'Error: Only the owner can view users.')
+    return
+  }
+
+  var response = ['*Allowed Users:*'];
+  _.forEach(acl.allowedUsers, function(n, key) {
+    response.push('*' + (key + 1) + '*) ' + n.username);
+  });
+  var opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+  };
+  bot.sendMessage(chatId, response.join('\n'), opts);
+});
+
+function handleRevokeUser(chatId, fromId, revokedUser) {
+
+  var user = _.filter(acl.allowedUsers, function(item) {
+    return item.username == revokedUser;
+  })[0];
+  
+  acl.allowedUsers.splice(user.id -1, 1)
+  saveACL();
 }
 
 /*

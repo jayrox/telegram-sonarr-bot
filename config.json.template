@@ -2,6 +2,10 @@
   "telegram": {
     "botToken": ""
   },
+  "bot": {
+    "password": "",
+    "owner": 0
+  },
   "sonarr": {
     "hostname": "",
     "apiKey": "",
