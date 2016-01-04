@@ -31,7 +31,6 @@ try {
 try {
   var acl = require('./acl.json');
 } catch (e) {
-    console.log(e)
   var acl = {};
 }
 
@@ -70,12 +69,11 @@ bot.onText(/\/start/, function(msg) {
   var username = msg.from.username || msg.from.first_name;
 
   var fromId = msg.from.id;
-  if ( ! authorizedUser(fromId) ) {
+  if (!authorizedUser(fromId)) {
     console.log("Not Authorized: " + fromId)
-    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.')
+    replyWithError(chatId, 'Hello ' + username + ', you are not authorized to use this bot.\n/auth [password] to authorize.');
     return;
   }
-
 
   var response = [];
 
