@@ -26,12 +26,14 @@ npm install
 
 Then copy `config.json.template` to `config.json` and fill in the values.
 
+Telegram:
 - **botToken** your Telegram Bot token
+
+Bot:
 - **password** the password to access the bot
 - **owner** your Telegram user ID. (you can fill this in later)
 
-Sonarr specific configuration:
-
+Sonarr:
 - **hostname**: hostname where Sonarr runs (required)
 - **apiKey**: Your API to access Sonarr (required)
 - **port**: port number Sonarr is listening on (optional, default: 5050)
