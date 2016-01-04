@@ -590,4 +590,5 @@ function clearCache(fromId) {
   cache.del('seriesFolderId' + fromId);
   cache.del('seriesFolderList' + fromId);
   cache.del('seriesMonitorList' + fromId);
+  cache.del('state' + fromId);
 }
