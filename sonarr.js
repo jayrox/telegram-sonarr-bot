@@ -535,9 +535,11 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
   // update seasons to be monitored
   postOpts.seasons = series.seasons;
 
+  logger.info('user: %s, message: adding series "%s" with options %s', fromId, series.title, JSON.stringify(postOpts));
+
   sonarr.post('series', postOpts)
     .then(function(result) {
-      logger.info('user: %s, message: added series %s', fromId, series.title);
+      logger.info('user: %s, message: added series "%s"', fromId, series.title);
 
       if (!result) {
         throw new Error('could not add series, try searching again.');
