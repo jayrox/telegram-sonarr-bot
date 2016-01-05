@@ -205,45 +205,41 @@ bot.on('message', function(msg) {
       return;
     }
 
-    // check cache to determine state, if cache empty prompt user to start a series search
-    if (currentState === undefined) {
-      replyWithError(chatId, 'Try searching for a movie first with `/q [series]`');
-    }
-
     switch (currentState) {
       case state.sonarr.SERIES:
         logger.info('user: %s, message: choose the series %s', fromId, message);
         handleSeries(chatId, fromId, message);
         break;
       case state.sonarr.PROFILE:
-        logger.info('user: %s, message: choose the profile %s', fromId, message);
+        logger.info('user: %s, message: choose the profile "%s"', fromId, message);
         handleSeriesProfile(chatId, fromId, message);
         break;
       case state.sonarr.FOLDER:
-        logger.info('user: %s, message: choose the folder %s', fromId, message);
+        logger.info('user: %s, message: choose the folder "%s"', fromId, message);
         handleSeriesFolder(chatId, fromId, message);
         break;
       case state.sonarr.MONITOR:
-        logger.info('user: %s, message: choose the monitor type %s', fromId, message);
+        logger.info('user: %s, message: choose the monitor type "%s"', fromId, message);
         handleSeriesMonitor(chatId, fromId, message);
         break;
       case state.admin.REVOKE:
-        logger.info('user: %s, message: choose to revoke user %s', fromId, message);
+        logger.info('user: %s, message: choose to revoke user "%s"', fromId, message);
         handleRevokeUser(chatId, fromId, message);
         break;
       case state.admin.REVOKE_CONFIRM:
-        logger.info('user: %s, message: choose the revoke confirmation %s', fromId, message);
+        logger.info('user: %s, message: choose the revoke confirmation "%s"', fromId, message);
         handleRevokeUserConfirm(chatId, fromId, message);
         break;
       case state.admin.UNREVOKE:
-        logger.info('user: %s, message: choose to unrevoke user %s', fromId, message);
+        logger.info('user: %s, message: choose to unrevoke user "%s"', fromId, message);
         handleUnRevokeUser(chatId, fromId, message);
         break;
       case state.admin.UNREVOKE_CONFIRM:
-        logger.info('user: %s, message: choose the unrevoke confirmation %s', fromId, message);
+        logger.info('user: %s, message: choose the unrevoke confirmation "%s"', fromId, message);
         handleUnRevokeUserConfirm(chatId, fromId, message);
         break;
       default:
+        logger.info('user: %s, message: received unknown message "%s"', fromId, message);
         replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
     }
   }
@@ -458,6 +454,7 @@ bot.onText(/\/rss/, function(msg) {
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, 'Only the owner can issue RSS Sync.');
+    return;
   }
 
   sonarr.post('command', {
@@ -483,6 +480,7 @@ bot.onText(/\/refresh/, function(msg) {
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, 'Only the owner can refresh series.');
+    return;
   }
 
   sonarr.post('command', {
@@ -687,8 +685,10 @@ function handleSeriesFolder(chatId, fromId, folderName) {
   var seriesId = cache.get('seriesId' + fromId);
   var seriesList = cache.get('seriesList' + fromId);
   var folderList = cache.get('seriesFolderList' + fromId);
+
   if (seriesList === undefined || seriesId === undefined || folderList === undefined) {
     replyWithError(chatId, 'something went wrong, try searching again');
+    return;
   }
 
   var folder = _.filter(folderList, function(item) {
