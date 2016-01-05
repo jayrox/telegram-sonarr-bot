@@ -22,6 +22,11 @@ try {
   createACL();
 }
 
+var i18nStrings = {
+    notAuthorized: 'You are not authorized to use this bot.\n/auth [password] to authorize.',
+    ownerOnly: 'Only the owner can view users.'
+};
+
 // add basic logging support
 var logger = new(winston.Logger)({
   transports: [
@@ -46,7 +51,9 @@ var state = {
   SERIES: 1,
   PROFILE: 2,
   FOLDER: 3,
-  MONITOR: 4
+  MONITOR: 4,
+  OWNERREVOKE: 5,
+  OWNERREVOKECONFIRM: 6
 };
 
 var bot = new TelegramBot(process.env.TELEGRAM_BOTTOKEN || config.telegram.botToken, {
@@ -87,7 +94,7 @@ bot.onText(/\/start/, function(msg) {
   logger.info('user: %s, message: sent \'/start\' command', fromId);
 
   if (!authorizedUser(fromId)) {
-    replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
+    replyWithError(chatId, i18nStrings.notAuthorized);
   }
 
   var response = ['Hello ' + username + ', use /q to search'];
@@ -112,7 +119,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
   logger.info('user: %s, message: sent \'/query\' command', fromId);
 
   if (!authorizedUser(fromId)) {
-    replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
+    replyWithError(chatId, i18nStrings.notAuthorized);
   }
 
   sonarr.get('series/lookup', {
@@ -198,7 +205,7 @@ bot.on('message', function(msg) {
 
     // make sure the user has privileges
     if (!authorizedUser(fromId)) {
-      replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
+      replyWithError(chatId, i18nStrings.notAuthorized);
     }
 
     // check cache to determine state, if cache empty prompt user to start a series search
@@ -222,6 +229,14 @@ bot.on('message', function(msg) {
       case state.MONITOR:
         logger.info('user: %s, message: choose the monitor type %s', fromId, message);
         handleSeriesMonitor(chatId, fromId, message);
+        break;
+      case state.OWNERREVOKE:
+        logger.info('user: %s, message: choose to revoke user %s', fromId, message);
+        handleRevokeUser(chatId, fromId, message);
+        break;
+      case state.OWNERREVOKECONFIRM:
+        logger.info('user: %s, message: choose the revoke confirmation %s', fromId, message);
+        handleRevokeUserConfirm(chatId, fromId, message);
         break;
       default:
         replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
@@ -616,7 +631,7 @@ bot.onText(/\/users/, function(msg) {
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, 'Only the owner can view users.');
+    replyWithError(chatId, i18nStrings.ownerOnly);
   }
 
   var response = ['*Allowed Users:*'];
@@ -632,6 +647,141 @@ bot.onText(/\/users/, function(msg) {
 
   bot.sendMessage(chatId, response.join('\n'), opts);
 });
+
+/*
+ * handle user acces revocation
+ */
+bot.onText(/\/revoke/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18nStrings.ownerOnly);
+  }
+
+  var opts = {};
+
+  if (acl.allowedUsers.length === 0) {
+    var message = 'There aren\'t any allowed users.';
+    opts = {
+      'disable_web_page_preview': true,
+      'parse_mode': 'Markdown',
+      'selective': 2,
+    };
+    bot.sendMessage(chatId, message, opts);
+    return;
+  }
+
+  var keyboardList = [];
+  var keyboardRow = [];
+  var response = ['*Allowed Users:*'];
+  _.forEach(acl.allowedUsers, function(n, key) {
+    response.push('*' + (key + 1) + '*) ' + n.username);
+
+    keyboardRow.push(n.username);
+    if (keyboardRow.length == 2) {
+      keyboardList.push(keyboardRow);
+      keyboardRow = [];
+    }
+  });
+
+  if (keyboardRow.length == 1) {
+    keyboardList.push([keyboardRow[0]]);
+  }
+
+  // set cache
+  cache.set('state' + fromId, state.OWNERREVOKE);
+
+  var keyboard = {
+    keyboard: keyboardList,
+    one_time_keyboard: true
+  };
+  opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+    'reply_markup': JSON.stringify(keyboard),
+  };
+  bot.sendMessage(chatId, response.join('\n'), opts);
+});
+
+function handleRevokeUser(chatId, fromId, revokedUser) {
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18nStrings.ownerOnly);
+  }
+
+  var keyboardList = [];
+  var response = ['Are you sure you want to revoke access to ' + revokedUser + '?'];
+  keyboardList.push(["NO"]);
+  keyboardList.push(["yes"]);
+
+  // set cache
+  cache.set('state' + fromId, state.OWNERREVOKECONFIRM);
+  cache.set('revokedUserName' + fromId, revokedUser);
+
+  logger.info('user: %s, message: selected revoke user %s', fromId, revokedUser);
+
+  var keyboard = {
+    keyboard: keyboardList,
+    one_time_keyboard: true
+  };
+  var opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+    'reply_markup': JSON.stringify(keyboard),
+  };
+  bot.sendMessage(chatId, response.join('\n'), opts);
+}
+
+function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18nStrings.ownerOnly);
+  }
+
+  logger.info('user: %s, message: selected revoke confirmation %s', fromId, revokedConfirm);
+
+  var revokedUser = cache.get('revokedUserName' + fromId);
+  var opts = {};
+  var message = '';
+  if (revokedConfirm === 'NO' || revokedConfirm === 'no') {
+      clearCache(fromId);
+      message = 'Access for ' + revokedUser + ' has *NOT* been revoked.';
+      opts = {
+        'disable_web_page_preview': true,
+         'parse_mode': 'Markdown',
+        'selective': 2,
+      };
+      bot.sendMessage(chatId, message, opts);
+      return;
+  }
+
+  var index = acl.allowedUsers.map(function(e) { return e.username; }).indexOf(revokedUser);
+
+  acl.allowedUsers.splice(index, 1);
+  updateACL();
+
+  message = 'Access for ' + revokedUser + ' has been revoked.';
+  opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+  };
+  bot.sendMessage(chatId, message, opts);
+  clearCache(fromId);
+}
 
 /*
  * handle rss sync
@@ -693,7 +843,7 @@ bot.onText(/\/clear/, function(msg) {
   logger.info('user: %s, message: sent \'/clear\' command', fromId);
 
   if (!authorizedUser(fromId)) {
-    replyWithError(chatId, 'You are not authorized to use this bot.\n/auth [password] to authorize.');
+    replyWithError(chatId, i18nStrings.notAuthorized);
   }
 
   logger.info('user: %s, message: \'/clear\' command successfully executed', fromId);
@@ -782,4 +932,5 @@ function clearCache(fromId) {
   cache.del('seriesFolderList' + fromId);
   cache.del('seriesMonitorList' + fromId);
   cache.del('state' + fromId);
+  cache.del('revokedUserName' + fromId);
 }
