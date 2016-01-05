@@ -1,5 +1,9 @@
 ## Changelog
 
+### v0.2.0
+- Added `/revoke` and `/unrevoke` commands for admin
+- Fixed a few Docker issues.
+
 ### v0.1.9
 - Fixed issue with keyboard not clearing when issuing `/clear` command
 - Create ACL file when it doesn't exist, you will be told to restart the bot if it doesn't exist
