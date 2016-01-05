@@ -290,6 +290,14 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
     message.push('Already authorized.');
     message.push('Type /start to begin.');
     bot.sendMessage(chatId, message.join('\n'));
+    return;
+  }
+
+  if (revokedUser(fromId)) {
+    message.push('Your access has been revoked and cannot reauthorize.');
+    message.push('Please reach out to the bot owner for support.');
+    bot.sendMessage(chatId, message.join('\n'));
+    return;
   }
 
   var userPass = match[1];
@@ -877,6 +885,7 @@ function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
 
   var index = acl.allowedUsers.map(function(e) { return e.username; }).indexOf(revokedUser);
 
+  acl.revokedUsers.push(acl.allowedUsers[index])
   acl.allowedUsers.splice(index, 1);
   updateACL();
 
@@ -924,6 +933,26 @@ function authorizedUser(userId) {
 
   if (acl.allowedUsers.length > 0) {
     user = _.filter(acl.allowedUsers, function(item) {
+      return item.id == userId;
+    })[0];
+  }
+
+  if ((user !== undefined && user.id > 0)) {
+    return true;
+  }
+
+  return false;
+}
+
+function revokedUser(userId) {
+  var user = {
+    id: 0,
+    first_name: '',
+    username: ''
+  };
+
+  if (acl.revokedUsers.length > 0) {
+    user = _.filter(acl.revokedUsers, function(item) {
       return item.id == userId;
     })[0];
   }
