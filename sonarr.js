@@ -87,8 +87,9 @@ bot.onText(/\/start/, function(msg) {
 
   logger.info('user: %s, message: sent \'/start\' command', fromId);
 
-  if (!authorizedUser(fromId)) {
+  if (!isAuthorized(fromId)) {
     replyWithError(chatId, i18n.__('notAuthorized'));
+    return;
   }
 
   var response = ['Hello ' + username + ', use /q to search'];
@@ -112,8 +113,9 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 
   logger.info('user: %s, message: sent \'/query\' command', fromId);
 
-  if (!authorizedUser(fromId)) {
+  if (!isAuthorized(fromId)) {
     replyWithError(chatId, i18n.__('notAuthorized'));
+    return;
   }
 
   sonarr.get('series/lookup', {
@@ -195,11 +197,12 @@ bot.on('message', function(msg) {
 
   // If the message is a command, ignore it.
   var currentState = cache.get('state' + fromId);
-  if (message[0] !== '/' || (currentState === state.sonarr.FOLDER && message[0] === '/')) {
 
+  if (message[0] !== '/' || (currentState === state.sonarr.FOLDER && message[0] === '/')) {
     // make sure the user has privileges
-    if (!authorizedUser(fromId)) {
+    if (!isAuthorized(fromId)) {
       replyWithError(chatId, i18n.__('notAuthorized'));
+      return;
     }
 
     // check cache to determine state, if cache empty prompt user to start a series search
@@ -252,24 +255,26 @@ bot.on('message', function(msg) {
 bot.onText(/\/auth (.+)/, function(msg, match) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
+  var password = match[1];
 
   var message = [];
 
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     message.push('Already authorized.');
     message.push('Type /start to begin.');
     bot.sendMessage(chatId, message.join('\n'));
+    return;
   }
 
-  if (revokedUser(fromId)) {
+  // make sure the user is not banned
+  if (isRevoked(fromId)) {
     message.push('Your access has been revoked and cannot reauthorize.');
     message.push('Please reach out to the bot owner for support.');
     bot.sendMessage(chatId, message.join('\n'));
+    return;
   }
 
-  var userPass = match[1];
-
-  if (userPass === (config.bot.password || process.env.BOT_PASSWORD)) {
+  if (password === (config.bot.password || process.env.BOT_PASSWORD)) {
     acl.allowedUsers.push(msg.from);
     updateACL();
 
@@ -296,12 +301,13 @@ bot.onText(/\/users/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, i18n.__('adminOnly'));
+    return;
   }
 
   var response = ['*Allowed Users:*'];
@@ -325,12 +331,13 @@ bot.onText(/\/revoke/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, i18n.__('adminOnly'));
+    return;
   }
 
   var opts = {};
@@ -385,12 +392,13 @@ bot.onText(/\/unrevoke/, function(msg) {
   var chatId = msg.chat.id;
   var fromId = msg.from.id;
 
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, i18n.__('adminOnly'));
+    return;
   }
 
   var opts = {};
@@ -498,8 +506,9 @@ bot.onText(/\/clear/, function(msg) {
 
   logger.info('user: %s, message: sent \'/clear\' command', fromId);
 
-  if (!authorizedUser(fromId)) {
+  if (!isAuthorized(fromId)) {
     replyWithError(chatId, i18n.__('notAuthorized'));
+    return;
   }
 
   logger.info('user: %s, message: \'/clear\' command successfully executed', fromId);
@@ -851,12 +860,13 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
 }
 
 function handleRevokeUser(chatId, fromId, revokedUser) {
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, i18n.__('adminOnly'));
+    return;
   }
 
   var keyboardList = [];
@@ -884,12 +894,13 @@ function handleRevokeUser(chatId, fromId, revokedUser) {
 }
 
 function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, i18n.__('adminOnly'));
+    return;
   }
 
   logger.info('user: %s, message: selected revoke confirmation %s', fromId, revokedConfirm);
@@ -926,12 +937,13 @@ function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
 }
 
 function handleUnRevokeUser(chatId, fromId, revokedUser) {
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, i18n.__('adminOnly'));
+    return;
   }
 
   var keyboardList = [];
@@ -959,12 +971,13 @@ function handleUnRevokeUser(chatId, fromId, revokedUser) {
 }
 
 function handleUnRevokeUserConfirm(chatId, fromId, revokedConfirm) {
-  if (authorizedUser(fromId)) {
+  if (isAuthorized(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
     replyWithError(chatId, i18n.__('adminOnly'));
+    return;
   }
 
   logger.info('user: %s, message: selected unrevoke confirmation %s', fromId, revokedConfirm);
@@ -999,13 +1012,11 @@ function handleUnRevokeUserConfirm(chatId, fromId, revokedConfirm) {
   clearCache(fromId);
 }
 
-
 /*
  * save access control list
  */
 function updateACL() {
-  var updatedAcl = JSON.stringify(acl);
-  fs.writeFile(__dirname + '/acl.json', updatedAcl, function(err) {
+  fs.writeFile(__dirname + '/acl.json', JSON.stringify(acl), function(err) {
     if (err) {
       throw new Error(err);
     }
@@ -1025,36 +1036,20 @@ function createACL() {
   });
 }
 
-function authorizedUser(userId) {
-  var user = { id: 0, first_name: '', username: '' };
-
-  if (acl.allowedUsers.length > 0) {
-    user = _.filter(acl.allowedUsers, function(item) {
-      return item.id == userId;
-    })[0];
-  }
-
-  if ((user !== undefined && user.id > 0)) {
-    return true;
-  }
-
-  return false;
+/*
+ * check to see is user is authenticated
+ * returns true/false
+ */
+function isAuthorized(userId) {
+  return _.some(acl.allowedUsers, { 'id': userId });
 }
 
-function revokedUser(userId) {
-  var user = { id: 0, first_name: '', username: '' };
-
-  if (acl.revokedUsers.length > 0) {
-    user = _.filter(acl.revokedUsers, function(item) {
-      return item.id == userId;
-    })[0];
-  }
-
-  if ((user !== undefined && user.id > 0)) {
-    return true;
-  }
-
-  return false;
+/*
+ * check to see is user is banned
+ * returns true/false
+ */
+function isRevoked(userId) {
+  return _.some(acl.revokedUsers, { 'id': userId });
 }
 
 function promptOwnerConfig(chatId, fromId) {
