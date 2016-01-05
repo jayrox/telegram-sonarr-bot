@@ -28,7 +28,9 @@ try {
 try {
   var acl = require(__dirname + '/acl.json');
 } catch (err) {
-  createACL();
+  var acl = {};
+  acl.allowedUsers = [];
+  acl.revokedUsers = [];
 }
 
 /*
@@ -1022,17 +1024,6 @@ function updateACL() {
     }
 
     logger.info('the access control list was updated!');
-  });
-}
-
-function createACL() {
-  fs.writeFile(__dirname + '/acl.json', '{"allowedUsers":[],"revokedUsers":[]}', function(err) {
-    if (err) {
-      throw new Error(err);
-    }
-
-    logger.info('the access control list was created, please restart the bot!');
-    process.exit(1);
   });
 }
 
