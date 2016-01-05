@@ -76,7 +76,9 @@ var state = {
   },
   admin: {
     REVOKE: 'adminRevoke',
-    REVOKE_CONFIRM: 'adminRevokeConfirm'
+    REVOKE_CONFIRM: 'adminRevokeConfirm',
+    UNREVOKE: 'adminUnrevoke',
+    UNREVOKE_CONFIRM: 'adminUnrevokeConfirm'
   }
 };
 
@@ -271,6 +273,14 @@ bot.on('message', function(msg) {
         logger.info('user: %s, message: choose the revoke confirmation %s', fromId, message);
         handleRevokeUserConfirm(chatId, fromId, message);
         break;
+      case state.admin.UNREVOKE:
+        logger.info('user: %s, message: choose to unrevoke user %s', fromId, message);
+        handleUnRevokeUser(chatId, fromId, message);
+        break;
+      case state.admin.UNREVOKE_CONFIRM:
+        logger.info('user: %s, message: choose the unrevoke confirmation %s', fromId, message);
+        handleUnRevokeUserConfirm(chatId, fromId, message);
+        break;
       default:
         replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
     }
@@ -352,7 +362,7 @@ bot.onText(/\/users/, function(msg) {
 });
 
 /*
- * handle user acces revocation
+ * handle user access revocation
  */
 bot.onText(/\/revoke/, function(msg) {
   var chatId = msg.chat.id;
@@ -411,6 +421,68 @@ bot.onText(/\/revoke/, function(msg) {
   };
   bot.sendMessage(chatId, response.join('\n'), opts);
 });
+
+/*
+ * handle user access unrevocation
+ */
+bot.onText(/\/unrevoke/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18n.__('adminOnly'));
+  }
+
+  var opts = {};
+
+  if (acl.revokedUsers.length === 0) {
+    var message = 'There aren\'t any revoked users.';
+    opts = {
+      'disable_web_page_preview': true,
+      'parse_mode': 'Markdown',
+      'selective': 2,
+    };
+    bot.sendMessage(chatId, message, opts);
+    return;
+  }
+
+  var keyboardList = [];
+  var keyboardRow = [];
+  var response = ['*Revoked Users:*'];
+  _.forEach(acl.revokedUsers, function(n, key) {
+    response.push('*' + (key + 1) + '*) ' + n.username);
+
+    keyboardRow.push(n.username);
+    if (keyboardRow.length == 2) {
+      keyboardList.push(keyboardRow);
+      keyboardRow = [];
+    }
+  });
+
+  if (keyboardRow.length == 1) {
+    keyboardList.push([keyboardRow[0]]);
+  }
+
+  // set cache
+  cache.set('state' + fromId, state.admin.UNREVOKE);
+
+  var keyboard = {
+    keyboard: keyboardList,
+    one_time_keyboard: true
+  };
+  opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+    'reply_markup': JSON.stringify(keyboard),
+  };
+  bot.sendMessage(chatId, response.join('\n'), opts);
+});
+
 
 /*
  * handle rss sync
@@ -885,7 +957,7 @@ function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
 
   var index = acl.allowedUsers.map(function(e) { return e.username; }).indexOf(revokedUser);
 
-  acl.revokedUsers.push(acl.allowedUsers[index])
+  acl.revokedUsers.push(acl.allowedUsers[index]);
   acl.allowedUsers.splice(index, 1);
   updateACL();
 
@@ -898,6 +970,81 @@ function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
   bot.sendMessage(chatId, message, opts);
   clearCache(fromId);
 }
+
+function handleUnRevokeUser(chatId, fromId, revokedUser) {
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18n.__('adminOnly'));
+  }
+
+  var keyboardList = [];
+  var response = ['Are you sure you want to unrevoke access for ' + revokedUser + '?'];
+  keyboardList.push(['NO']);
+  keyboardList.push(['yes']);
+
+  // set cache
+  cache.set('state' + fromId, state.admin.UNREVOKE_CONFIRM);
+  cache.set('revokedUserName' + fromId, revokedUser);
+
+  logger.info('user: %s, message: selected unrevoke user %s', fromId, revokedUser);
+
+  var keyboard = {
+    keyboard: keyboardList,
+    one_time_keyboard: true
+  };
+  var opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+    'reply_markup': JSON.stringify(keyboard),
+  };
+  bot.sendMessage(chatId, response.join('\n'), opts);
+}
+
+function handleUnRevokeUserConfirm(chatId, fromId, revokedConfirm) {
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18n.__('adminOnly'));
+  }
+
+  logger.info('user: %s, message: selected unrevoke confirmation %s', fromId, revokedConfirm);
+
+  var revokedUser = cache.get('revokedUserName' + fromId);
+  var opts = {};
+  var message = '';
+  if (revokedConfirm === 'NO' || revokedConfirm === 'no') {
+      clearCache(fromId);
+      message = 'Access for ' + revokedUser + ' has *NOT* been unrevoked.';
+      opts = {
+        'disable_web_page_preview': true,
+         'parse_mode': 'Markdown',
+        'selective': 2,
+      };
+      bot.sendMessage(chatId, message, opts);
+      return;
+  }
+
+  var index = acl.revokedUsers.map(function(e) { return e.username; }).indexOf(revokedUser);
+
+  acl.revokedUsers.splice(index, 1);
+  updateACL();
+
+  message = 'Access for ' + revokedUser + ' has been unrevoked.';
+  opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+  };
+  bot.sendMessage(chatId, message, opts);
+  clearCache(fromId);
+}
+
 
 /*
  * save access control list
