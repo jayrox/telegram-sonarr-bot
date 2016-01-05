@@ -6,9 +6,9 @@ var NodeCache   = require('node-cache');                // https://www.npmjs.com
 var SonarrAPI   = require('sonarr-api');                // https://www.npmjs.com/package/sonarr-api
 var TelegramBot = require('node-telegram-bot-api');     // https://www.npmjs.com/package/node-telegram-bot-api
 
-var state = require(__dirname + '/lib/state');
+var state  = require(__dirname + '/lib/state');
 var logger = require(__dirname + '/lib/logger');
-var i18n = require(__dirname + '/lib/lang');
+var i18n   = require(__dirname + '/lib/lang');
 
 /*
  * import config
@@ -1026,11 +1026,7 @@ function createACL() {
 }
 
 function authorizedUser(userId) {
-  var user = {
-    id: 0,
-    first_name: '',
-    username: ''
-  };
+  var user = { id: 0, first_name: '', username: '' };
 
   if (acl.allowedUsers.length > 0) {
     user = _.filter(acl.allowedUsers, function(item) {
@@ -1046,11 +1042,7 @@ function authorizedUser(userId) {
 }
 
 function revokedUser(userId) {
-  var user = {
-    id: 0,
-    first_name: '',
-    username: ''
-  };
+  var user = { id: 0, first_name: '', username: '' };
 
   if (acl.revokedUsers.length > 0) {
     user = _.filter(acl.revokedUsers, function(item) {
