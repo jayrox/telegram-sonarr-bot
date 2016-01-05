@@ -24,15 +24,17 @@ cd telegram-sonarr-bot
 npm install
 ```
 
-Copy `acl.json.template` to `acl.json`
 ```bash
+# Copy acl.json.template to acl.json
 cp acl.json.template acl.json
 ```
 
-Copy `config.json.template` to `config.json` and fill in the values below.
 ```bash
+# Copy config.json.template to config.json
 cp config.json.template config.json
 ```
+
+In `config.json` fill in the values below:
 
 Telegram:
 - **botToken** your Telegram Bot token
