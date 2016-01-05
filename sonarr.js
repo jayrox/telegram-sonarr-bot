@@ -300,14 +300,12 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
     message.push('Already authorized.');
     message.push('Type /start to begin.');
     bot.sendMessage(chatId, message.join('\n'));
-    return;
   }
 
   if (revokedUser(fromId)) {
     message.push('Your access has been revoked and cannot reauthorize.');
     message.push('Please reach out to the bot owner for support.');
     bot.sendMessage(chatId, message.join('\n'));
-    return;
   }
 
   var userPass = match[1];
@@ -386,7 +384,6 @@ bot.onText(/\/revoke/, function(msg) {
       'selective': 2,
     };
     bot.sendMessage(chatId, message, opts);
-    return;
   }
 
   var keyboardList = [];
@@ -447,7 +444,6 @@ bot.onText(/\/unrevoke/, function(msg) {
       'selective': 2,
     };
     bot.sendMessage(chatId, message, opts);
-    return;
   }
 
   var keyboardList = [];
@@ -655,14 +651,13 @@ function handleSeriesProfile(chatId, fromId, profileName) {
   var profile = _.filter(profileList, function(item) {
     return item.label == profileName;
   })[0];
+
   if (profile === undefined) {
     throw new Error('could not find the profile ' + profileName);
   }
 
-  var profileId = profile.id;
-
   // set series option to cache
-  cache.set('seriesProfileId' + fromId, profileId);
+  cache.set('seriesProfileId' + fromId, profile.id);
 
   sonarr.get('rootfolder')
     .then(function(result) {
@@ -1121,7 +1116,7 @@ function promptOwnerConfig(chatId, fromId) {
 }
 
 /*
- * Shared err message logic, primarily to handle removing the custom keyboard
+ * shared err message logic, primarily to handle removing the custom keyboard
  */
 function replyWithError(chatId, err) {
   bot.sendMessage(chatId, 'Oh no! ' + err, {
@@ -1132,6 +1127,9 @@ function replyWithError(chatId, err) {
   });
 }
 
+/*
+ * clear caches
+ */
 function clearCache(fromId) {
   cache.del('seriesId' + fromId);
   cache.del('seriesList' + fromId);
