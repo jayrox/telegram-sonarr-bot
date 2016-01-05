@@ -13,7 +13,7 @@ var i18n = require('i18n'); // multilingual support
  */
 i18n.configure({
     locales: ['en'],
-    directory: './locales'
+    directory: __dirname + '/locales'
 });
 
 /*
@@ -48,7 +48,7 @@ var logger = new(Winston.Logger)({
       prettyPrint: true,
       colorize: true
     }),
-    new(Winston.transports.File)({ filename: 'sonarr.log', json: true })
+    new(Winston.transports.File)({ filename: __dirname + '/sonarr.log', json: true })
   ]
 });
 
@@ -1061,7 +1061,7 @@ function updateACL() {
 }
 
 function createACL() {
-  fs.writeFile('./acl.json', '{"allowedUsers":[]}', function(err) {
+  fs.writeFile('./acl.json', '{"allowedUsers":[],"revokedUsers":[]}', function(err) {
     if (err) {
       throw new Error(err);
     }
