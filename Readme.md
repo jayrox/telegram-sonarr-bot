@@ -125,6 +125,8 @@ If everything goes well, you'll see a text from the bot saying the series was ad
 * `/rss` perform an RSS Sync
 * `/refresh` refreshes all series
 * `/users` list users
+* `/revoke` ban user from bot
+* `/unrevoke` unban user from bot
 
 ## Docker
 Alternatively you may use Docker to start the bot
