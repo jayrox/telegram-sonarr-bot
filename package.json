@@ -4,6 +4,7 @@
   "description": "A Telegram bot to interact with your Sonarr Web App",
   "dependencies": {
     "bluebird": "^2.9.2",
+    "i18n": "^0.5.0",
     "lodash": "^3.10.0",
     "node-cache": "^3.0.0",
     "node-telegram-bot-api": "^0.17.0",

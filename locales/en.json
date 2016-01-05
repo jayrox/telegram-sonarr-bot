@@ -1,0 +1,5 @@
+{
+  "hello": "Hello",
+  "notAuthorized": "You are not authorized to use this bot.\n`/auth [password]` to authorize.",
+  "adminOnly": "Only the admin use this feature."
+}

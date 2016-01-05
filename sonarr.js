@@ -1,12 +1,24 @@
 'use strict';
 
-var SonarrAPI = require('sonarr-api');
-var TelegramBot = require('node-telegram-bot-api');
-var NodeCache = require('node-cache');
-var fs = require('fs');
-var _ = require('lodash');
-var winston = require('winston');
+var fs = require('fs'); // file system
+var _ = require('lodash'); // object / array manipulations
+var NodeCache = require('node-cache'); // storing cache states
+var SonarrAPI = require('sonarr-api'); // access sonarr api
+var TelegramBot = require('node-telegram-bot-api'); // sending/recieving telegram messages
+var Winston = require('winston'); // logging
+var i18n = require('i18n'); // multilingual support
 
+/*
+ * set up multilingual support
+ */
+i18n.configure({
+    locales: ['en'],
+    directory: './locales'
+});
+
+/*
+ * import config
+ */
 try {
   var config = require('./config.json');
 } catch (err) {
@@ -16,30 +28,33 @@ try {
   config.sonarr = {};
 }
 
+/*
+ * import users
+ */
 try {
   var acl = require('./acl.json');
 } catch (err) {
   createACL();
 }
 
-var i18nStrings = {
-    notAuthorized: 'You are not authorized to use this bot.\n/auth [password] to authorize.',
-    ownerOnly: 'Only the owner can view users.'
-};
-
-// add basic logging support
-var logger = new(winston.Logger)({
+/*
+ * add logging support via winston
+ */
+var logger = new(Winston.Logger)({
   transports: [
-    new(winston.transports.Console)({
+    new(Winston.transports.Console)({
       json: false,
       timestamp: true,
       prettyPrint: true,
       colorize: true
     }),
-    new(winston.transports.File)({ filename: 'sonarr.log', json: true })
+    new(Winston.transports.File)({ filename: 'sonarr.log', json: true })
   ]
 });
 
+/*
+ * define response class
+ */
 class Response {
   constructor(message, keyboard) {
     this.message = message;
@@ -47,19 +62,34 @@ class Response {
   }
 }
 
+/*
+ * set up states
+ * these are here to keep track
+ * of the current question
+ */
 var state = {
-  SERIES: 1,
-  PROFILE: 2,
-  FOLDER: 3,
-  MONITOR: 4,
-  OWNERREVOKE: 5,
-  OWNERREVOKECONFIRM: 6
+  sonarr: {
+    SERIES: 'sonarrSeries',
+    PROFILE: 'sonarrProfile',
+    FOLDER: 'sonarrFolder',
+    MONITOR: 'sonarrMonitor'
+  },
+  admin: {
+    REVOKE: 'adminRevoke',
+    REVOKE_CONFIRM: 'adminRevokeConfirm'
+  }
 };
 
+/*
+ * set up the telegram bot
+ */
 var bot = new TelegramBot(process.env.TELEGRAM_BOTTOKEN || config.telegram.botToken, {
   polling: true
 });
 
+/*
+ * set up the sonarr api
+ */
 var sonarr = new SonarrAPI({
   hostname: process.env.SONARR_HOST || config.sonarr.hostname,
   apiKey: process.env.SONARR_APIKEY || config.sonarr.apiKey,
@@ -70,6 +100,9 @@ var sonarr = new SonarrAPI({
   password: process.env.SONARR_PASSWORD || config.sonarr.password
 });
 
+/*
+ * set up a simple caching tool
+ */
 var cache = new NodeCache();
 
 /*
@@ -94,7 +127,7 @@ bot.onText(/\/start/, function(msg) {
   logger.info('user: %s, message: sent \'/start\' command', fromId);
 
   if (!authorizedUser(fromId)) {
-    replyWithError(chatId, i18nStrings.notAuthorized);
+    replyWithError(chatId, i18n.__('notAuthorized'));
   }
 
   var response = ['Hello ' + username + ', use /q to search'];
@@ -119,7 +152,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
   logger.info('user: %s, message: sent \'/query\' command', fromId);
 
   if (!authorizedUser(fromId)) {
-    replyWithError(chatId, i18nStrings.notAuthorized);
+    replyWithError(chatId, i18n.__('notAuthorized'));
   }
 
   sonarr.get('series/lookup', {
@@ -168,7 +201,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 
       // set cache
       cache.set('seriesList' + fromId, seriesList);
-      cache.set('state' + fromId, state.SERIES);
+      cache.set('state' + fromId, state.sonarr.SERIES);
 
       return new Response(response.join('\n'), keyboardList);
     })
@@ -201,11 +234,11 @@ bot.on('message', function(msg) {
 
   // If the message is a command, ignore it.
   var currentState = cache.get('state' + fromId);
-  if (message[0] !== '/' || (currentState === state.FOLDER && message[0] === '/')) {
+  if (message[0] !== '/' || (currentState === state.sonarr.FOLDER && message[0] === '/')) {
 
     // make sure the user has privileges
     if (!authorizedUser(fromId)) {
-      replyWithError(chatId, i18nStrings.notAuthorized);
+      replyWithError(chatId, i18n.__('notAuthorized'));
     }
 
     // check cache to determine state, if cache empty prompt user to start a series search
@@ -214,27 +247,27 @@ bot.on('message', function(msg) {
     }
 
     switch (currentState) {
-      case state.SERIES:
+      case state.sonarr.SERIES:
         logger.info('user: %s, message: choose the series %s', fromId, message);
         handleSeries(chatId, fromId, message);
         break;
-      case state.PROFILE:
+      case state.sonarr.PROFILE:
         logger.info('user: %s, message: choose the profile %s', fromId, message);
         handleSeriesProfile(chatId, fromId, message);
         break;
-      case state.FOLDER:
+      case state.sonarr.FOLDER:
         logger.info('user: %s, message: choose the folder %s', fromId, message);
         handleSeriesFolder(chatId, fromId, message);
         break;
-      case state.MONITOR:
+      case state.sonarr.MONITOR:
         logger.info('user: %s, message: choose the monitor type %s', fromId, message);
         handleSeriesMonitor(chatId, fromId, message);
         break;
-      case state.OWNERREVOKE:
+      case state.admin.REVOKE:
         logger.info('user: %s, message: choose to revoke user %s', fromId, message);
         handleRevokeUser(chatId, fromId, message);
         break;
-      case state.OWNERREVOKECONFIRM:
+      case state.admin.REVOKE_CONFIRM:
         logger.info('user: %s, message: choose the revoke confirmation %s', fromId, message);
         handleRevokeUserConfirm(chatId, fromId, message);
         break;
@@ -242,6 +275,207 @@ bot.on('message', function(msg) {
         replyWithError(chatId, 'Unsure what\'s going on, use the `/clear` command and start over.');
     }
   }
+});
+
+/*
+ * handle authorization
+ */
+bot.onText(/\/auth (.+)/, function(msg, match) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  var message = [];
+
+  if (authorizedUser(fromId)) {
+    message.push('Already authorized.');
+    message.push('Type /start to begin.');
+    bot.sendMessage(chatId, message.join('\n'));
+  }
+
+  var userPass = match[1];
+
+  if (userPass === (config.bot.password || process.env.BOT_PASSWORD)) {
+    acl.allowedUsers.push(msg.from);
+    updateACL();
+
+    if (acl.allowedUsers.length === 1) {
+      promptOwnerConfig(chatId, fromId);
+    }
+
+    message.push('You have been authorized.');
+    message.push('Type /start to begin.');
+    bot.sendMessage(chatId, message.join('\n'));
+  } else {
+    bot.sendMessage(chatId, 'Invalid password.');
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) > 0) {
+    bot.sendMessage(config.bot.owner || process.env.BOT_OWNER, msg.from.username + ' has been granted access.');
+  }
+});
+
+/*
+ * handle users
+ */
+bot.onText(/\/users/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18n.__('adminOnly'));
+  }
+
+  var response = ['*Allowed Users:*'];
+  _.forEach(acl.allowedUsers, function(n, key) {
+    response.push('*' + (key + 1) + '*) ' + n.username);
+  });
+
+  var opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+  };
+
+  bot.sendMessage(chatId, response.join('\n'), opts);
+});
+
+/*
+ * handle user acces revocation
+ */
+bot.onText(/\/revoke/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  if (authorizedUser(fromId)) {
+    promptOwnerConfig(chatId, fromId);
+  }
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, i18n.__('adminOnly'));
+  }
+
+  var opts = {};
+
+  if (acl.allowedUsers.length === 0) {
+    var message = 'There aren\'t any allowed users.';
+    opts = {
+      'disable_web_page_preview': true,
+      'parse_mode': 'Markdown',
+      'selective': 2,
+    };
+    bot.sendMessage(chatId, message, opts);
+    return;
+  }
+
+  var keyboardList = [];
+  var keyboardRow = [];
+  var response = ['*Allowed Users:*'];
+  _.forEach(acl.allowedUsers, function(n, key) {
+    response.push('*' + (key + 1) + '*) ' + n.username);
+
+    keyboardRow.push(n.username);
+    if (keyboardRow.length == 2) {
+      keyboardList.push(keyboardRow);
+      keyboardRow = [];
+    }
+  });
+
+  if (keyboardRow.length == 1) {
+    keyboardList.push([keyboardRow[0]]);
+  }
+
+  // set cache
+  cache.set('state' + fromId, state.admin.REVOKE);
+
+  var keyboard = {
+    keyboard: keyboardList,
+    one_time_keyboard: true
+  };
+  opts = {
+    'disable_web_page_preview': true,
+    'parse_mode': 'Markdown',
+    'selective': 2,
+    'reply_markup': JSON.stringify(keyboard),
+  };
+  bot.sendMessage(chatId, response.join('\n'), opts);
+});
+
+/*
+ * handle rss sync
+ */
+bot.onText(/\/rss/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  logger.info('user: %s, message: sent \'/rss\' command', fromId);
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, 'Only the owner can issue RSS Sync.');
+  }
+
+  sonarr.post('command', {
+      'name': 'RssSync'
+    })
+    .then(function() {
+      logger.info('user: %s, message: \'/rss\' command successfully executed', fromId);
+      bot.sendMessage(chatId, 'RSS Sync command sent.');
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
+});
+
+/*
+ * handle refresh series
+ */
+bot.onText(/\/refresh/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  logger.info('user: %s, message: sent \'/refresh\' command', fromId);
+
+  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
+    replyWithError(chatId, 'Only the owner can refresh series.');
+  }
+
+  sonarr.post('command', {
+      'name': 'RefreshSeries'
+    })
+    .then(function() {
+      logger.info('user: %s, message: \'/refresh\' command successfully executed', fromId);
+      bot.sendMessage(chatId, 'Refresh series command sent.');
+    })
+    .catch(function(err) {
+      replyWithError(chatId, err);
+    });
+});
+
+/*
+ * handle clear command
+ */
+bot.onText(/\/clear/, function(msg) {
+  var chatId = msg.chat.id;
+  var fromId = msg.from.id;
+
+  logger.info('user: %s, message: sent \'/clear\' command', fromId);
+
+  if (!authorizedUser(fromId)) {
+    replyWithError(chatId, i18n.__('notAuthorized'));
+  }
+
+  logger.info('user: %s, message: \'/clear\' command successfully executed', fromId);
+
+  clearCache(fromId);
+
+  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!', {
+    'reply_markup': {
+      'hide_keyboard': true
+    }
+  });
 });
 
 function handleSeries(chatId, fromId, seriesDisplayName) {
@@ -310,7 +544,7 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
 
       // set cache
       cache.set('seriesProfileList' + fromId, profileList);
-      cache.set('state' + fromId, state.PROFILE);
+      cache.set('state' + fromId, state.sonarr.PROFILE);
 
       return new Response(response.join('\n'), keyboardList);
     })
@@ -384,7 +618,7 @@ function handleSeriesProfile(chatId, fromId, profileName) {
 
       // set cache
       cache.set('seriesFolderList' + fromId, folderList);
-      cache.set('state' + fromId, state.FOLDER);
+      cache.set('state' + fromId, state.sonarr.FOLDER);
 
       return new Response(response.join('\n'), keyboardList);
     })
@@ -453,7 +687,7 @@ function handleSeriesFolder(chatId, fromId, folderName) {
 
   // set cache
   cache.set('seriesMonitorList' + fromId, monitorList);
-  cache.set('state' + fromId, state.MONITOR);
+  cache.set('state' + fromId, state.sonarr.MONITOR);
 
   var keyboard = {
     keyboard: keyboardList,
@@ -582,149 +816,22 @@ function handleSeriesMonitor(chatId, fromId, monitorType) {
     });
 }
 
-/*
- * handle authorization
- */
-bot.onText(/\/auth (.+)/, function(msg, match) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  var message = [];
-
-  if (authorizedUser(fromId)) {
-    message.push('Already authorized.');
-    message.push('Type /start to begin.');
-    bot.sendMessage(chatId, message.join('\n'));
-  }
-
-  var userPass = match[1];
-
-  if (userPass === (config.bot.password || process.env.BOT_PASSWORD)) {
-    acl.allowedUsers.push(msg.from);
-    updateACL();
-
-    if (acl.allowedUsers.length === 1) {
-      promptOwnerConfig(chatId, fromId);
-    }
-
-    message.push('You have been authorized.');
-    message.push('Type /start to begin.');
-    bot.sendMessage(chatId, message.join('\n'));
-  } else {
-    bot.sendMessage(chatId, 'Invalid password.');
-  }
-
-  if ((config.bot.owner || process.env.BOT_OWNER) > 0) {
-    bot.sendMessage(config.bot.owner || process.env.BOT_OWNER, msg.from.username + ' has been granted access.');
-  }
-});
-
-/*
- * handle users
- */
-bot.onText(/\/users/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  if (authorizedUser(fromId)) {
-    promptOwnerConfig(chatId, fromId);
-  }
-
-  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, i18nStrings.ownerOnly);
-  }
-
-  var response = ['*Allowed Users:*'];
-  _.forEach(acl.allowedUsers, function(n, key) {
-    response.push('*' + (key + 1) + '*) ' + n.username);
-  });
-
-  var opts = {
-    'disable_web_page_preview': true,
-    'parse_mode': 'Markdown',
-    'selective': 2,
-  };
-
-  bot.sendMessage(chatId, response.join('\n'), opts);
-});
-
-/*
- * handle user acces revocation
- */
-bot.onText(/\/revoke/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  if (authorizedUser(fromId)) {
-    promptOwnerConfig(chatId, fromId);
-  }
-
-  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, i18nStrings.ownerOnly);
-  }
-
-  var opts = {};
-
-  if (acl.allowedUsers.length === 0) {
-    var message = 'There aren\'t any allowed users.';
-    opts = {
-      'disable_web_page_preview': true,
-      'parse_mode': 'Markdown',
-      'selective': 2,
-    };
-    bot.sendMessage(chatId, message, opts);
-    return;
-  }
-
-  var keyboardList = [];
-  var keyboardRow = [];
-  var response = ['*Allowed Users:*'];
-  _.forEach(acl.allowedUsers, function(n, key) {
-    response.push('*' + (key + 1) + '*) ' + n.username);
-
-    keyboardRow.push(n.username);
-    if (keyboardRow.length == 2) {
-      keyboardList.push(keyboardRow);
-      keyboardRow = [];
-    }
-  });
-
-  if (keyboardRow.length == 1) {
-    keyboardList.push([keyboardRow[0]]);
-  }
-
-  // set cache
-  cache.set('state' + fromId, state.OWNERREVOKE);
-
-  var keyboard = {
-    keyboard: keyboardList,
-    one_time_keyboard: true
-  };
-  opts = {
-    'disable_web_page_preview': true,
-    'parse_mode': 'Markdown',
-    'selective': 2,
-    'reply_markup': JSON.stringify(keyboard),
-  };
-  bot.sendMessage(chatId, response.join('\n'), opts);
-});
-
 function handleRevokeUser(chatId, fromId, revokedUser) {
   if (authorizedUser(fromId)) {
     promptOwnerConfig(chatId, fromId);
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, i18nStrings.ownerOnly);
+    replyWithError(chatId, i18n.__('adminOnly'));
   }
 
   var keyboardList = [];
   var response = ['Are you sure you want to revoke access to ' + revokedUser + '?'];
-  keyboardList.push(["NO"]);
-  keyboardList.push(["yes"]);
+  keyboardList.push(['NO']);
+  keyboardList.push(['yes']);
 
   // set cache
-  cache.set('state' + fromId, state.OWNERREVOKECONFIRM);
+  cache.set('state' + fromId, state.admin.REVOKE_CONFIRM);
   cache.set('revokedUserName' + fromId, revokedUser);
 
   logger.info('user: %s, message: selected revoke user %s', fromId, revokedUser);
@@ -748,7 +855,7 @@ function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, i18nStrings.ownerOnly);
+    replyWithError(chatId, i18n.__('adminOnly'));
   }
 
   logger.info('user: %s, message: selected revoke confirmation %s', fromId, revokedConfirm);
@@ -782,80 +889,6 @@ function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
   bot.sendMessage(chatId, message, opts);
   clearCache(fromId);
 }
-
-/*
- * handle rss sync
- */
-bot.onText(/\/rss/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  logger.info('user: %s, message: sent \'/rss\' command', fromId);
-
-  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, 'Only the owner can issue RSS Sync.');
-  }
-
-  sonarr.post('command', {
-      'name': 'RssSync'
-    })
-    .then(function() {
-      logger.info('user: %s, message: \'/rss\' command successfully executed', fromId);
-      bot.sendMessage(chatId, 'RSS Sync command sent.');
-    })
-    .catch(function(err) {
-      replyWithError(chatId, err);
-    });
-});
-
-/*
- * handle refresh series
- */
-bot.onText(/\/refresh/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  logger.info('user: %s, message: sent \'/refresh\' command', fromId);
-
-  if ((config.bot.owner || process.env.BOT_OWNER) !== fromId) {
-    replyWithError(chatId, 'Only the owner can refresh series.');
-  }
-
-  sonarr.post('command', {
-      'name': 'RefreshSeries'
-    })
-    .then(function() {
-      logger.info('user: %s, message: \'/refresh\' command successfully executed', fromId);
-      bot.sendMessage(chatId, 'Refresh series command sent.');
-    })
-    .catch(function(err) {
-      replyWithError(chatId, err);
-    });
-});
-
-/*
- * handle clear command
- */
-bot.onText(/\/clear/, function(msg) {
-  var chatId = msg.chat.id;
-  var fromId = msg.from.id;
-
-  logger.info('user: %s, message: sent \'/clear\' command', fromId);
-
-  if (!authorizedUser(fromId)) {
-    replyWithError(chatId, i18nStrings.notAuthorized);
-  }
-
-  logger.info('user: %s, message: \'/clear\' command successfully executed', fromId);
-
-  clearCache(fromId);
-
-  bot.sendMessage(chatId, 'All previously sent commands have been cleared, yey!', {
-    'reply_markup': {
-      'hide_keyboard': true
-    }
-  });
-});
 
 /*
  * save access control list
