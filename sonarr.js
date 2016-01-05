@@ -1,20 +1,14 @@
 'use strict';
 
-var fs = require('fs'); // file system
-var _ = require('lodash'); // object / array manipulations
-var NodeCache = require('node-cache'); // storing cache states
-var SonarrAPI = require('sonarr-api'); // access sonarr api
-var TelegramBot = require('node-telegram-bot-api'); // sending/recieving telegram messages
-var Winston = require('winston'); // logging
-var i18n = require('i18n'); // multilingual support
+var fs          = require('fs');                        // https://nodejs.org/api/fs.html
+var _           = require('lodash');                    // https://www.npmjs.com/package/lodash
+var NodeCache   = require('node-cache');                // https://www.npmjs.com/package/node-cache
+var SonarrAPI   = require('sonarr-api');                // https://www.npmjs.com/package/sonarr-api
+var TelegramBot = require('node-telegram-bot-api');     // https://www.npmjs.com/package/node-telegram-bot-api
 
-/*
- * set up multilingual support
- */
-i18n.configure({
-    locales: ['en'],
-    directory: __dirname + '/locales'
-});
+var state = require(__dirname + '/lib/state');
+var logger = require(__dirname + '/lib/logger');
+var i18n = require(__dirname + '/lib/lang');
 
 /*
  * import config
@@ -38,21 +32,6 @@ try {
 }
 
 /*
- * add logging support via winston
- */
-var logger = new(Winston.Logger)({
-  transports: [
-    new(Winston.transports.Console)({
-      json: false,
-      timestamp: true,
-      prettyPrint: true,
-      colorize: true
-    }),
-    new(Winston.transports.File)({ filename: __dirname + '/sonarr.log', json: true })
-  ]
-});
-
-/*
  * define response class
  */
 class Response {
@@ -61,26 +40,6 @@ class Response {
     this.keyboard = keyboard;
   }
 }
-
-/*
- * set up states
- * these are here to keep track
- * of the current question
- */
-var state = {
-  sonarr: {
-    SERIES: 'sonarrSeries',
-    PROFILE: 'sonarrProfile',
-    FOLDER: 'sonarrFolder',
-    MONITOR: 'sonarrMonitor'
-  },
-  admin: {
-    REVOKE: 'adminRevoke',
-    REVOKE_CONFIRM: 'adminRevokeConfirm',
-    UNREVOKE: 'adminUnrevoke',
-    UNREVOKE_CONFIRM: 'adminUnrevokeConfirm'
-  }
-};
 
 /*
  * set up the telegram bot
@@ -105,7 +64,7 @@ var sonarr = new SonarrAPI({
 /*
  * set up a simple caching tool
  */
-var cache = new NodeCache();
+var cache = new NodeCache({ stdTTL: 120, checkperiod: 150 });
 
 /*
  * get the bot name
@@ -176,7 +135,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 
       _.forEach(series, function(n, key) {
         var id = key + 1;
-        var keyboard_value = n.title + (n.year ? ' - ' + n.year : '');
+        var keyboardValue = n.title + (n.year ? ' - ' + n.year : '');
 
         seriesList.push({
           'id': id,
@@ -185,10 +144,10 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
           'tvdbId': n.tvdbId,
           'titleSlug': n.titleSlug,
           'seasons': n.seasons,
-          'keyboard_value': keyboard_value
+          'keyboardValue': keyboardValue
         });
 
-        keyboardList.push([keyboard_value]);
+        keyboardList.push( [keyboardValue] );
 
         response.push(
           '*' + id + '*) ' +
@@ -561,7 +520,7 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
   }
 
   var series = _.filter(seriesList, function(item) {
-    return item.keyboard_value == seriesDisplayName;
+    return item.keyboardValue == seriesDisplayName;
   })[0];
 
   if (series === undefined) {
@@ -1116,7 +1075,7 @@ function promptOwnerConfig(chatId, fromId) {
 }
 
 /*
- * shared err message logic, primarily to handle removing the custom keyboard
+ * handle removing the custom keyboard
  */
 function replyWithError(chatId, err) {
   bot.sendMessage(chatId, 'Oh no! ' + err, {
