@@ -20,7 +20,7 @@ i18n.configure({
  * import config
  */
 try {
-  var config = require('./config.json');
+  var config = require(__dirname + '/config.json');
 } catch (err) {
   var config = {};
   config.telegram = {};
@@ -32,7 +32,7 @@ try {
  * import users
  */
 try {
-  var acl = require('./acl.json');
+  var acl = require(__dirname + '/acl.json');
 } catch (err) {
   createACL();
 }
@@ -1046,7 +1046,7 @@ function handleUnRevokeUserConfirm(chatId, fromId, revokedConfirm) {
  */
 function updateACL() {
   var updatedAcl = JSON.stringify(acl);
-  fs.writeFile('./acl.json', updatedAcl, function(err) {
+  fs.writeFile(__dirname + '/acl.json', updatedAcl, function(err) {
     if (err) {
       throw new Error(err);
     }
@@ -1056,7 +1056,7 @@ function updateACL() {
 }
 
 function createACL() {
-  fs.writeFile('./acl.json', '{"allowedUsers":[],"revokedUsers":[]}', function(err) {
+  fs.writeFile(__dirname + '/acl.json', '{"allowedUsers":[],"revokedUsers":[]}', function(err) {
     if (err) {
       throw new Error(err);
     }
