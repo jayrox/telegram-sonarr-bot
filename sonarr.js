@@ -134,11 +134,10 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
 
       var seriesList = [];
       var keyboardList = [];
-      var response = ['*Found ' + series.length + ' series:*'];
 
-      if (series.length > config.bot.maxResults ) {
-        series.length = config.bot.maxResults;
-      }
+      series.length = (series.length > config.bot.maxResults ? config.bot.maxResults : series.length);
+
+      var response = ['*Found ' + series.length + ' series:*'];
 
       _.forEach(series, function(n, key) {
         var id = key + 1;
