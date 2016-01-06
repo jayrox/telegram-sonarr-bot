@@ -309,7 +309,7 @@ bot.onText(/\/users/, function(msg) {
 
   var response = ['*Allowed Users:*'];
   _.forEach(acl.allowedUsers, function(n, key) {
-    response.push('*' + (key + 1) + '*) ' + (n.username || n.first_name));
+    response.push('*' + (key + 1) + '*) ' + getTelegramName(n));
   });
 
   var opts = {
