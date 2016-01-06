@@ -136,6 +136,10 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
       var keyboardList = [];
       var response = ['*Found ' + series.length + ' series:*'];
 
+      if (series.length > config.bot.maxResults ) {
+        series.length = config.bot.maxResults;
+      }
+
       _.forEach(series, function(n, key) {
         var id = key + 1;
         var keyboardValue = n.title + (n.year ? ' - ' + n.year : '');
