@@ -4,7 +4,8 @@
   },
   "bot": {
     "password": "",
-    "owner": 0
+    "owner": 0,
+    "maxResults": 15
   },
   "sonarr": {
     "hostname": "",
