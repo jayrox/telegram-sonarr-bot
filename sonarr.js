@@ -84,7 +84,6 @@ bot.getMe()
  */
 bot.onText(/\/start/, function(msg) {
   var chatId = msg.chat.id;
-  var username = msg.from.username || msg.from.first_name;
   var fromId = msg.from.id;
 
   logger.info('user: %s, message: sent \'/start\' command', fromId);
@@ -94,7 +93,7 @@ bot.onText(/\/start/, function(msg) {
     return;
   }
 
-  var response = ['Hello ' + username + ', use /q to search'];
+  var response = ['Hello ' + getTelegramName(msg.from) + ', use /q to search'];
   response.push('\n`/q [series name]` to continue...');
 
   var opts = {
@@ -160,7 +159,7 @@ bot.onText(/\/[Qq](uery)? (.+)/, function(msg, match) {
         );
       });
 
-      response.push('\nPlease select from the menu below...');
+      response.push(i18n.__('selectFromMenu'));
 
       logger.info('user: %s, message: found the following series %s', fromId, keyboardList.join(', '));
 
@@ -288,7 +287,7 @@ bot.onText(/\/auth (.+)/, function(msg, match) {
   }
 
   if ((config.bot.owner || process.env.BOT_OWNER) > 0) {
-    bot.sendMessage(config.bot.owner || process.env.BOT_OWNER, msg.from.username + ' has been granted access.');
+    bot.sendMessage(config.bot.owner || process.env.BOT_OWNER, getTelegramName(msg.from) + ' has been granted access.');
   }
 });
 
@@ -310,7 +309,7 @@ bot.onText(/\/users/, function(msg) {
 
   var response = ['*Allowed Users:*'];
   _.forEach(acl.allowedUsers, function(n, key) {
-    response.push('*' + (key + 1) + '*) ' + n.username);
+    response.push('*' + (key + 1) + '*) ' + (n.username || n.first_name));
   });
 
   var opts = {
@@ -352,16 +351,25 @@ bot.onText(/\/revoke/, function(msg) {
 
   var keyboardList = [];
   var keyboardRow = [];
+  var revokeList = [];
   var response = ['*Allowed Users:*'];
   _.forEach(acl.allowedUsers, function(n, key) {
-    response.push('*' + (key + 1) + '*) ' + n.username);
+    revokeList.push({
+      'id': key + 1,
+      'userId': n.id,
+      'keyboardValue': getTelegramName(n)
+    });
+    response.push('*' + (key + 1) + '*) ' + getTelegramName(n));
 
-    keyboardRow.push(n.username);
+    keyboardRow.push(getTelegramName(n));
     if (keyboardRow.length == 2) {
       keyboardList.push(keyboardRow);
       keyboardRow = [];
     }
   });
+
+  response.push(i18n.__('selectFromMenu'));
+
 
   if (keyboardRow.length == 1) {
     keyboardList.push([keyboardRow[0]]);
@@ -369,6 +377,7 @@ bot.onText(/\/revoke/, function(msg) {
 
   // set cache
   cache.set('state' + fromId, state.admin.REVOKE);
+  cache.set('revokeUserList' + fromId, revokeList);
 
   var keyboard = {
     keyboard: keyboardList,
@@ -413,16 +422,25 @@ bot.onText(/\/unrevoke/, function(msg) {
 
   var keyboardList = [];
   var keyboardRow = [];
+  var revokeList = [];
   var response = ['*Revoked Users:*'];
   _.forEach(acl.revokedUsers, function(n, key) {
-    response.push('*' + (key + 1) + '*) ' + n.username);
+    revokeList.push({
+      'id': key + 1,
+      'userId': n.id,
+      'keyboardValue': getTelegramName(n)
+    });
 
-    keyboardRow.push(n.username);
+    response.push('*' + (key + 1) + '*) ' + getTelegramName(n));
+ 
+    keyboardRow.push(getTelegramName(n));
     if (keyboardRow.length == 2) {
       keyboardList.push(keyboardRow);
       keyboardRow = [];
     }
   });
+
+  response.push(i18n.__('selectFromMenu'));
 
   if (keyboardRow.length == 1) {
     keyboardList.push([keyboardRow[0]]);
@@ -430,6 +448,7 @@ bot.onText(/\/unrevoke/, function(msg) {
 
   // set cache
   cache.set('state' + fromId, state.admin.UNREVOKE);
+  cache.set('unrevokeUserList' + fromId, revokeList);
 
   var keyboard = {
     keyboard: keyboardList,
@@ -582,7 +601,7 @@ function handleSeries(chatId, fromId, seriesDisplayName) {
       if (keyboardRow.length == 1) {
         keyboardList.push([keyboardRow[0]]);
       }
-      response.push('\nPlease select from the menu below.');
+      response.push(i18n.__('selectFromMenu'));
 
       logger.info('user: %s, message: found the following profiles %s', fromId, keyboardList.join(', '));
 
@@ -655,7 +674,7 @@ function handleSeriesProfile(chatId, fromId, profileName) {
 
         keyboardList.push([n.path]);
       });
-      response.push('\nPlease select from the menu below.');
+      response.push(i18n.__('selectFromMenu'));
 
       logger.info('user: %s, message: found the following folders %s', fromId, keyboardList.join(', '));
 
@@ -726,7 +745,7 @@ function handleSeriesFolder(chatId, fromId, folderName) {
     keyboardList.push([keyboardRow[0]]);
   }
 
-  response.push('\nPlease select from the menu below.');
+  response.push(i18n.__('selectFromMenu'));
 
   logger.info('user: %s, message: found the following monitor types %s', fromId, keyboardList.join(', '));
 
@@ -921,11 +940,13 @@ function handleRevokeUserConfirm(chatId, fromId, revokedConfirm) {
       bot.sendMessage(chatId, message, opts);
       return;
   }
+  var revokedUserList = cache.get('revokeUserList' + fromId);
+  var i = revokedUserList.map(function(e) { return e.keyboardValue; }).indexOf(revokedUser);
+  var revokedUserObj = revokedUserList[i];
+  var j = acl.allowedUsers.map(function(e) { return e.id; }).indexOf(revokedUserObj.userId);
 
-  var index = acl.allowedUsers.map(function(e) { return e.username; }).indexOf(revokedUser);
-
-  acl.revokedUsers.push(acl.allowedUsers[index]);
-  acl.allowedUsers.splice(index, 1);
+  acl.revokedUsers.push(acl.allowedUsers[j]);
+  acl.allowedUsers.splice(j, 1);
   updateACL();
 
   message = 'Access for ' + revokedUser + ' has been revoked.';
@@ -999,9 +1020,11 @@ function handleUnRevokeUserConfirm(chatId, fromId, revokedConfirm) {
       return;
   }
 
-  var index = acl.revokedUsers.map(function(e) { return e.username; }).indexOf(revokedUser);
-
-  acl.revokedUsers.splice(index, 1);
+  var unrevokedUserList = cache.get('unrevokeUserList' + fromId);
+  var i = unrevokedUserList.map(function(e) { return e.keyboardValue; }).indexOf(revokedUser);
+  var unrevokedUserObj = unrevokedUserList[i];
+  var j = acl.revokedUsers.map(function(e) { return e.id; }).indexOf(unrevokedUserObj.userId);
+  acl.revokedUsers.splice(j, 1);
   updateACL();
 
   message = 'Access for ' + revokedUser + ' has been unrevoked.';
@@ -1077,4 +1100,12 @@ function clearCache(fromId) {
   cache.del('seriesMonitorList' + fromId);
   cache.del('state' + fromId);
   cache.del('revokedUserName' + fromId);
+  cache.del('revokeUserList' + fromId);
+}
+
+/*
+ * get telegram name
+ */
+function getTelegramName(user) {
+   return user.username || (user.first_name + (' ' + user.last_name || ''));
 }
